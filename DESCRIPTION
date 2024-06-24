@@ -1,0 +1,19 @@
+Package: fabOF
+Type: Package
+Title: Frequency Adjusted Borders Ordinal Forest for Ordinal Prediction
+Version: 0.1.0
+Date: 2024-06-24
+Author: Philip Buczak
+Maintainer: Philip Buczak <buczak@statistik.tu-dortmund.de>
+Description: Implementation of Frequency Adjusted Borders Ordinal Forest (fabOF; Buczak, 2024) for prediction of ordinal responses based on random forest.
+    Extends classical random forest for ordinal responses by assigning numeric scores to response categories. 
+    Prediction of unseen observations through numeric category borders determined by a heuristic based on the cumulative frequencies of the ordinal response categories.
+    References:
+    Buczak, P. (2024). fabOF: A Novel Tree Ensemble Method for Ordinal Prediction. OSF Pre-print. <doi:10.31219/osf.io/h8t4p> 
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.1
+Imports: 
+    psych,
+    ranger
