@@ -10,7 +10,7 @@ devtools::install_github("phibuc/fabOF")
 ```
 
 ## References
-* Buczak, P. (2024a). fabOF: A Novel Tree Ensemble Method for Ordinal Prediction. OSF Pre-print. https://doi.org/10.31219/osf.io/h8t4p.
+* Buczak, P. (2024a). Frequency-adjusted borders ordinal forest: A novel tree ensemble method for ordinal prediction. British Journal of Mathematical and Statistical Psychology. https://doi.org/10.1111/bmsp.12375
 * Buczak, P. (2024b). Mixed-Effects Frequency-Adjusted Borders Ordinal Forest: A Tree Ensemble Method for Ordinal Prediction with Hierarchical Data. OSF Pre-print. https://doi.org/10.31219/osf.io/ny6we.
 * Wright, M. N. & Ziegler, A. (2017). ranger: A Fast Implementation of Random Forests for High Dimensional Data in C++ and R. J Stat Softw 77:1-17. https://doi.org/10.18637/jss.v077.i01.
 * Breiman, L. (2001). Random Forests. Mach Learn, 45:5-32. https://doi.org/10.1023/A:1010933404324.
