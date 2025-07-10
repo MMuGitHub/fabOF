@@ -223,7 +223,7 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
                    as.numeric(quantile(pred, probs = c(cum.prob.cats[-n.cats]))),
                    Inf)
 
-  browser()
+  #browser()
   
   if(importance) {
     pred.num <- sapply(pred, function(x) max(which(x >= cat.borders[1:length(cats)])))
