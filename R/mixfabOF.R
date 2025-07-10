@@ -223,6 +223,8 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
                    as.numeric(quantile(pred, probs = c(cum.prob.cats[-n.cats]))),
                    Inf)
 
+  browser()
+  
   if(importance) {
     pred.num <- sapply(pred, function(x) max(which(x >= cat.borders[1:length(cats)])))
     pred.cat <- factor(cats[pred.num], levels = cats)
@@ -233,9 +235,10 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
 
     for(v in 1:length(vars)) {
       var.orig <- data.tmp[, vars[v]]
+      print(v)
 
       for(r in 1:importance.reps) {
-
+        print(r)
         if(permute.clusterwise) {
           for(j in 1:n.grp) {
             id.j <- which(id == unique(id)[j])
