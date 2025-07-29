@@ -5,5 +5,5 @@ linearKappa <- function(y, ypred) {
   ydat <- data.frame(y = y, ypred = ypred)
   weight.mat <- abs(t(replicate(n.cats, 1:n.cats)) - replicate(n.cats, 1:n.cats))
   weight.mat <- 1 - weight.mat/(n.cats - 1)
-  psych::cohen.kappa(ydat, w = weight.mat)$weighted.kappa
+  psych::cohen.kappa(ydat, w = weight.mat, levels = levels(y))$weighted.kappa
 }
