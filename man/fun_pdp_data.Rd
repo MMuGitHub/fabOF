@@ -12,7 +12,6 @@ fun_pdp_data(
   pal = rev(RColorBrewer::brewer.pal(11, "RdYlBu")),
   gridSize = 10,
   nmax = 500,
-  class = 1,
   nIce = 30,
   predictFun = NULL,
   limits = NULL,
@@ -36,8 +35,6 @@ If \code{NULL}, all predictors except \code{response} are used.}
 
 \item{nmax}{Integer. Maximum number of rows sampled from \code{data} for ICE computation.}
 
-\item{class}{Integer. Class index for classification models (default 1).}
-
 \item{nIce}{Integer. Number of ICE curves to sample.}
 
 \item{predictFun}{Optional custom prediction function. If \code{NULL}, uses the default from \code{vivid}.}
@@ -45,13 +42,13 @@ If \code{NULL}, all predictors except \code{response} are used.}
 \item{limits}{Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.}
 
 \item{colorVar}{Optional variable name for colouring ICE curves (instead of prediction values).}
-
-\item{probability}{Logical. If \code{TRUE} for classification, predictions are probabilities.}
 }
 \value{
 A list of length 2:
   \item{ice_data}{Tibble with ICE curve data (same structure as \code{pdp[[1]]$data}).}
   \item{pdp_data}{Tibble with aggregated PDP curve data (mean over ICE curves).}
+  \item{.id}{Enumerates the the observations in the dataset.}
+  \item{.pid}{Enumerates the variables.}
 }
 \description{
 Generates the data required to plot ICE curves and the aggregated partial

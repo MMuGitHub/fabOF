@@ -13,16 +13,16 @@
 #' @param pal Colour palette (unused here but kept for API compatibility).
 #' @param gridSize Integer. Number of points to evaluate in the grid for each variable.
 #' @param nmax Integer. Maximum number of rows sampled from \code{data} for ICE computation.
-#' @param class Integer. Class index for classification models (default 1).
 #' @param nIce Integer. Number of ICE curves to sample.
 #' @param predictFun Optional custom prediction function. If \code{NULL}, uses the default from \code{vivid}.
 #' @param limits Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.
 #' @param colorVar Optional variable name for colouring ICE curves (instead of prediction values).
-#' @param probability Logical. If \code{TRUE} for classification, predictions are probabilities.
 #'
 #' @return A list of length 2:
 #'   \item{ice_data}{Tibble with ICE curve data (same structure as \code{pdp[[1]]$data}).}
 #'   \item{pdp_data}{Tibble with aggregated PDP curve data (mean over ICE curves).}
+#'   \item{.id}{Enumerates the the observations in the dataset.}
+#'   \item{.pid}{Enumerates the variables.}
 #' @importFrom condvis2 CVpredict
 #' @importFrom dplyr bind_rows filter group_by summarise
 #' @importFrom tibble as_tibble
@@ -35,7 +35,6 @@ fun_pdp_data <- function(data,
                          pal = rev(RColorBrewer::brewer.pal(11, "RdYlBu")),
                          gridSize = 10,
                          nmax = 500,
-                         class = 1,
                          nIce = 30,
                          predictFun = NULL,
                          limits = NULL,
@@ -53,20 +52,13 @@ fun_pdp_data <- function(data,
   }
   gridSize <- min(gridSize, nmax)
   
-  # Classification check
-  classif <- is.factor(data[[response]]) || inherits(fit, "LearnerClassif")
-  
   # Default predictFun from vivid
   if (is.null(predictFun)) {
-    predictFun <- CVpredictfun(classif, class)
+    predictFun <- CVpredictfun(class)
   }
   
   # Get base predictions for colour mapping
-  if (classif) {
-    predData <- predictFun(fit, data, prob = probability)
-  } else {
-    predData <- predictFun(fit, data)
-  }
+  predData <- predictFun(fit, data)
   
   # Determine predictor variables
   vars0 <- setdiff(names(data), response)
@@ -85,6 +77,8 @@ fun_pdp_data <- function(data,
   
   # Create grid data for each variable
   pdplist1 <- vector("list", length = length(vars))
+  # For each variable in vars split the range of the variable into gridSize many
+  # points.
   for (i in seq_along(vars)) {
     px <- vivid:::pdp_data(data, vars[i], gridsize = gridSize)
     px$.pid <- i
@@ -92,23 +86,12 @@ fun_pdp_data <- function(data,
   }
   pdplist1 <- dplyr::bind_rows(pdplist1)
   
-  # Predict on grid
-  if (classif) {
-    pdplist1$fit <- predictFun(fit, pdplist1, prob = probability)
-  } else {
-    pdplist1$fit <- predictFun(fit, pdplist1[, 1:(ncol(pdplist1) - 3)])
-  }
-  
+  # Predict Y on this grid for each observation and variable
+  pdplist1$fit <- predictFun(fit, pdplist1[, 1:(ncol(pdplist1) - 3)])
+
   # Split by variable for easier handling
   pdplist1 <- split(pdplist1, pdplist1$.pid)
   names(pdplist1) <- vars
-  
-  # Determine y limits if needed
-  if (is.null(limits)) {
-    r <- sapply(pdplist1, function(x) range(x$fit))
-    r <- range(c(r, predData))
-    limits <- range(labeling::rpretty(r[1], r[2]))
-  }
   
   # For now only return first variable's data
   var <- vars[[1]]
