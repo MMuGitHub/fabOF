@@ -54,16 +54,20 @@ fun_pdp_data <- function(data,
   
   # Default predictFun from vivid
   if (is.null(predictFun)) {
-    predictFun <- CVpredictfun(class)
+    predictFun <- CVpredictfun(class = class)
   }
   
   # Get base predictions for colour mapping
-  predData <- predictFun(fit, data)
+  #predData <- predictFun(fit, data)
   
   # Determine predictor variables
-  vars0 <- setdiff(names(data), response)
+  vars0 <- setdiff(names(data), response) #filter out response from vars
+  ## If one of the vars is not in the model, stop:
+  if (!all(vars %in% fit$forest$independent.variable.names)) {
+    stop("Some variables specified in 'vars' are not present in the model.")
+  }
+  
   vars <- vars[vars %in% vars0]
-  if (is.null(vars)) vars <- vars0
   
   # ICE curve sampling
   if (length(nIce) > 1) {
@@ -73,7 +77,7 @@ fun_pdp_data <- function(data,
     nIce <- min(nIce, nrow(data))
     sice <- c(NA, sample(nrow(data), nIce))
   }
-  data$predData <- predData
+  #data$predData <- predData
   
   # Create grid data for each variable
   pdplist1 <- vector("list", length = length(vars))
