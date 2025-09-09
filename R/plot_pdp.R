@@ -16,7 +16,6 @@
 #' @param gridSize Integer. Number of points to evaluate in the grid for each variable. Default is 10.
 #' @param nmax Integer. Maximum number of rows sampled from \code{data} for ICE computation. Default is 500.
 #' @param nIce Integer. Number of ICE curves to sample. Default is 30.
-#' @param predictFun Optional custom prediction function. If \code{NULL}, uses the default from \code{vivid}.
 #' @param limits Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.
 #' @param colorVar Optional variable name for colouring ICE curves (instead of prediction values).
 #' @param probability Logical. Whether to use probability predictions. Default is \code{FALSE}.
@@ -102,7 +101,6 @@ plot_pdp <- function(data,
                      gridSize = 10,
                      nmax = 500,
                      nIce = 30,
-                     predictFun = NULL,
                      limits = NULL,
                      colorVar = NULL,
                      probability = FALSE,
@@ -145,19 +143,37 @@ plot_pdp <- function(data,
     stop(paste0("Variable '", x_var, "' not found in data"))
   }
   
-  # Check variable type BEFORE processing data
-  unique_values <- length(unique(data[[x_var]]))
-  is_factor_or_char <- is.factor(data[[x_var]]) || is.character(data[[x_var]])
-  is_few_values <- unique_values <= 4
+  # Create vector of variable names used in the model
+  vars <- fit$forest$independent.variable.names
   
-  is_categorical <- is_factor_or_char || is_few_values
-  variable_type <- ifelse(is_categorical, "categorical", "continuous")
+  # Add random effect name:
+  random_terms <- lme4::findbars(model$random.formula)
+  randeff_name <- as.character(random_terms[[1]][[3]])
+  vars_with_randeff <- c(vars, randeff_name)
   
-  # Warning if treating numeric variable as categorical due to few values
-  if (!is_factor_or_char && is_few_values) {
-    warning(paste0("Variable '", x_var, "' has only ", unique_values, 
-                   " unique values. Treating as categorical and using ridgeline plot."))
+  for (var_name in vars) {
+    unique_values <- length(unique(data[[var_name]]))
+    is_factor_or_char <- is.factor(data[[var_name]]) || is.character(data[[var_name]])
+    is_few_values <- unique_values <= 4
+    
+    is_categorical <- is_factor_or_char || is_few_values
+    
+    # Warning if treating numeric variable as categorical due to few values
+    if (!is_factor_or_char && is_few_values) {
+      warning(paste0("Variable '", var_name, "' has only ", unique_values, 
+                     " unique values. Converting to factor."))
+    }
+    
+    # Transform to factor if categorical
+    if (is_categorical) {
+      data[[var_name]] <- as.factor(data[[var_name]])
+    }
   }
+  
+  # Now check the specific plotting variable type AFTER transformation
+  
+  is_categorical <- is.factor(data[[x_var]])
+  variable_type <- ifelse(is_categorical, "categorical", "continuous")
   
   # ============================================================================
   # DATA GENERATION (from fun_pdp_data)
@@ -173,19 +189,6 @@ plot_pdp <- function(data,
     data_clean <- data_clean[sample(1:nrow(data_clean), nmax), , drop = FALSE]
   }
   
-  # Returns prediction function from condvis2 package
-  if (is.null(predictFun)) {
-    predictFun <- CVpredictfun()
-  }
-  
-  # Create vector of variable names used in the model
-  vars <- fit$forest$independent.variable.names
-  
-  # Add random effect name:
-  random_terms <- lme4::findbars(model$random.formula)
-  randeff_name <- as.character(random_terms[[1]][[3]])
-  vars <- c(vars, randeff_name)
-  
   # ICE curve sampling
   if (length(nIce) > 1) {
     nIce <- nIce[nIce <= nrow(data_clean)]
@@ -196,17 +199,22 @@ plot_pdp <- function(data,
   }
   
   # Create grid data for each variable
-  pdplist1 <- vector("list", length = length(vars))
+  pdplist1 <- vector(mode = "list", length = length(vars))
   # For each variable in vars split the range of the variable into gridSize many points.
   for (i in seq_along(vars)) {
-    px <- vivid:::pdp_data(data_clean, vars[i], gridsize = gridSize)
+    #creates data for each variable in vars, for each observation, for 
+    #for each gridpoint.
+    #note: id refers to observation, pid refers to variable
+    px <- vivid:::pdp_data(d = data_clean, var = vars[i], gridsize = gridSize)
     px$.pid <- i
     pdplist1[[i]] <- px
   }
   pdplist1 <- dplyr::bind_rows(pdplist1)
   
   # Predict Y on this grid for each observation and variable
-  pdplist1$fit <- predictFun(fit, pdplist1[, 1:(ncol(pdplist1) - 3)])
+  browser()
+  pdplist1$fit <- predict(object = model, newdata = pdplist1[, vars_with_randeff])
+
   
   # Split by variable for easier handling
   pdplist1 <- split(pdplist1, pdplist1$.pid)
