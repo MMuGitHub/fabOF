@@ -21,6 +21,12 @@ predict.mixfabOF <- function(object, newdata, ...) {
   random.stripped <- gsub(" ", "", random.string)
   random.split <- strsplit(random.stripped, "\\|")[[1]]
   grp.var <- random.split[2]
+
+  if(is.null(newdata[[grp.var]])) {
+    warning("random effect column is missing in newdata. Predictions are based on RE = 0")
+    newdata[[grp.var]] <- rep(NA, nrow(newdata))
+  }
+
   id <- newdata[, grp.var]
   ran.var <- strsplit(random.split[1], "\\+")[[1]]
 

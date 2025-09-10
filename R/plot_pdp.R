@@ -213,7 +213,7 @@ plot_pdp <- function(data,
   
   # Predict Y on this grid for each observation and variable
   browser()
-  pdplist1$fit <- predict(object = model, newdata = pdplist1[, vars_with_randeff])
+  pdplist1$fit <- predict(object = model, newdata = pdplist1)
 
   
   # Split by variable for easier handling

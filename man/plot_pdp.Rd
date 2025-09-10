@@ -13,7 +13,6 @@ plot_pdp(
   gridSize = 10,
   nmax = 500,
   nIce = 30,
-  predictFun = NULL,
   limits = NULL,
   colorVar = NULL,
   probability = FALSE,
@@ -47,8 +46,6 @@ If \code{FALSE} (default), returns only the plot.}
 \item{nmax}{Integer. Maximum number of rows sampled from \code{data} for ICE computation. Default is 500.}
 
 \item{nIce}{Integer. Number of ICE curves to sample. Default is 30.}
-
-\item{predictFun}{Optional custom prediction function. If \code{NULL}, uses the default from \code{vivid}.}
 
 \item{limits}{Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.}
 
