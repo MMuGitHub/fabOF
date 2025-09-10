@@ -6,7 +6,8 @@
 #' @return Predicted ordinal response category labels.
 #' @author Philip Buczak
 #' @export
-predict.mixfabOF <- function(object, newdata, ...) {
+predict.mixfabOF <- 
+  function(object, newdata, type = c("response", "latent"), ...) {
 
   if(!inherits(object, "mixfabOF")) {
     stop("Error: Object must be of class mixfabOF.")
@@ -23,9 +24,11 @@ predict.mixfabOF <- function(object, newdata, ...) {
   grp.var <- random.split[2]
 
   if(is.null(newdata[[grp.var]])) {
-    warning("random effect column is missing in newdata. Predictions are based on RE = 0")
-    newdata[[grp.var]] <- rep(NA, nrow(newdata))
-  }
+    warning("Random effect column is missing in newdata. Predictions are based on RE = 0")
+    #newdata[[grp.var]] <- rep(NA, nrow(newdata))
+    pred <- ranger.pred
+    
+  } else {
 
   id <- newdata[, grp.var]
   ran.var <- strsplit(random.split[1], "\\+")[[1]]
@@ -51,11 +54,19 @@ predict.mixfabOF <- function(object, newdata, ...) {
       pred[id.j] <- ranger.pred[id.j]
     }
   }
+  
+  }
 
   # Inspired by Roman Hornung's ordinalForest R package
+  
   pred.num <- sapply(pred, function(x)
     max(which(x >= object$category.borders[1:length(object$categories)])))
   pred.cat <- factor(object$categories[pred.num], levels = object$categories)
 
-  return(pred.cat)
+  if(type == "latent") {
+    return(pred)
+  } else {
+    return(pred.cat)
+  }
+
 }

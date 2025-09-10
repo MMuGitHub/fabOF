@@ -13,9 +13,11 @@
 #' @param x_var Character string specifying the name of the predictor variable to plot.
 #' @param verbose Logical. If \code{TRUE}, returns a list with both data and plot. 
 #'   If \code{FALSE} (default), returns only the plot.
-#' @param gridSize Integer. Number of points to evaluate in the grid for each variable. Default is 10.
+#' @param gridsize Integer. Number of points to evaluate in the grid for each variable. Default is 10.
 #' @param nmax Integer. Maximum number of rows sampled from \code{data} for ICE computation. Default is 500.
-#' @param nIce Integer. Number of ICE curves to sample. Default is 30.
+#' @param nIce Integer or integer vector. If a single integer, 
+#' specifies the number of ICE curves to sample randomly (default is 30). 
+#' If a vector of integers, specifies the exact row indices of observations to use for ICE curves.
 #' @param limits Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.
 #' @param colorVar Optional variable name for colouring ICE curves (instead of prediction values).
 #' @param probability Logical. Whether to use probability predictions. Default is \code{FALSE}.
@@ -98,7 +100,7 @@ plot_pdp <- function(data,
                      response,
                      x_var,
                      verbose = FALSE,
-                     gridSize = 10,
+                     gridsize = 10,
                      nmax = 500,
                      nIce = 30,
                      limits = NULL,
@@ -152,22 +154,22 @@ plot_pdp <- function(data,
   vars_with_randeff <- c(vars, randeff_name)
   
   for (var_name in vars) {
-    unique_values <- length(unique(data[[var_name]]))
-    is_factor_or_char <- is.factor(data[[var_name]]) || is.character(data[[var_name]])
-    is_few_values <- unique_values <= 4
+    #unique_values <- length(unique(data[[var_name]]))
+    is_factor_or_char <- is.factor(data[[var_name]]) #|| is.character(data[[var_name]])
+    #is_few_values <- unique_values <= 4
     
-    is_categorical <- is_factor_or_char || is_few_values
+    is_categorical <- is_factor_or_char #|| is_few_values
     
     # Warning if treating numeric variable as categorical due to few values
-    if (!is_factor_or_char && is_few_values) {
-      warning(paste0("Variable '", var_name, "' has only ", unique_values, 
-                     " unique values. Converting to factor."))
-    }
-    
-    # Transform to factor if categorical
-    if (is_categorical) {
-      data[[var_name]] <- as.factor(data[[var_name]])
-    }
+    # if (!is_factor_or_char && is_few_values) {
+    #   warning(paste0("Variable '", var_name, "' has only ", unique_values, 
+    #                  " unique values. Converting to factor."))
+    # }
+    # 
+    # # Transform to factor if categorical
+    # if (is_categorical) {
+    #   data[[var_name]] <- as.factor(data[[var_name]])
+    # }
   }
   
   # Now check the specific plotting variable type AFTER transformation
@@ -200,24 +202,23 @@ plot_pdp <- function(data,
   
   # Create grid data for each variable
   pdplist1 <- vector(mode = "list", length = length(vars))
-  # For each variable in vars split the range of the variable into gridSize many points.
+  # For each variable in vars split the range of the variable into gridsize many points.
   for (i in seq_along(vars)) {
     #creates data for each variable in vars, for each observation, for 
     #for each gridpoint.
     #note: id refers to observation, pid refers to variable
-    px <- vivid:::pdp_data(d = data_clean, var = vars[i], gridsize = gridSize)
+    px <- vivid:::pdp_data(d = data_clean, var = vars[i], gridsize = gridsize)
     px$.pid <- i
     pdplist1[[i]] <- px
   }
   pdplist1 <- dplyr::bind_rows(pdplist1)
   
   # Predict Y on this grid for each observation and variable
-  browser()
-  pdplist1$fit <- predict(object = model, newdata = pdplist1)
 
+  pdplist1$fit <- predict(object = model, newdata = pdplist1, type = "latent")
   
   # Split by variable for easier handling
-  pdplist1 <- split(pdplist1, pdplist1$.pid)
+  pdplist1 <- base::split(x = pdplist1, f = pdplist1$.pid)
   names(pdplist1) <- vars
   
   # Extract data for the specified x_var
@@ -231,7 +232,7 @@ plot_pdp <- function(data,
   # Aggregate mean PDP
   aggr <- pdp %>%
     dplyr::group_by(.data[[x_var]]) %>%
-    dplyr::summarise(fit = mean(fit), .groups = "drop")
+    dplyr::summarise(fit = mean(fit))
   
   # Filter ICE data for selected curves
   pdp1 <- dplyr::filter(pdp, .data[[".id"]] %in% sice)
@@ -276,6 +277,8 @@ plot_pdp <- function(data,
   } else {
     x_range <- range(ice_data[[x_var]], na.rm = TRUE)
   }
+  
+  browser()
   
   # Create background rectangles if borders are provided
   if (!is.null(borders)) {

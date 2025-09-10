@@ -10,7 +10,7 @@ plot_pdp(
   response,
   x_var,
   verbose = FALSE,
-  gridSize = 10,
+  gridsize = 10,
   nmax = 500,
   nIce = 30,
   limits = NULL,
@@ -41,11 +41,13 @@ plot_pdp(
 \item{verbose}{Logical. If \code{TRUE}, returns a list with both data and plot. 
 If \code{FALSE} (default), returns only the plot.}
 
-\item{gridSize}{Integer. Number of points to evaluate in the grid for each variable. Default is 10.}
+\item{gridsize}{Integer. Number of points to evaluate in the grid for each variable. Default is 10.}
 
 \item{nmax}{Integer. Maximum number of rows sampled from \code{data} for ICE computation. Default is 500.}
 
-\item{nIce}{Integer. Number of ICE curves to sample. Default is 30.}
+\item{nIce}{Integer or integer vector. If a single integer, 
+specifies the number of ICE curves to sample randomly (default is 30). 
+If a vector of integers, specifies the exact row indices of observations to use for ICE curves.}
 
 \item{limits}{Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.}
 

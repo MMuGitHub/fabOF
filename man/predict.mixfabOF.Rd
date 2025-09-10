@@ -4,7 +4,7 @@
 \alias{predict.mixfabOF}
 \title{Predict mixfabOF}
 \usage{
-\method{predict}{mixfabOF}(object, newdata, ...)
+\method{predict}{mixfabOF}(object, newdata, type = c("response", "latent"), ...)
 }
 \arguments{
 \item{object}{Fitted mixfabOF model object.}
