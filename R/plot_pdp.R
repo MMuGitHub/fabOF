@@ -5,12 +5,13 @@
 #' whether the predictor variable is continuous or categorical and creates appropriate 
 #' visualizations. For continuous variables, it shows ICE lines with optional category 
 #' background mapping. For categorical variables, it creates ridgeline plots showing 
-#' the distribution of predictions for each category.
+#' the distribution of predictions for each category. test
 #'
 #' @param data A data frame containing the predictor variables and the response.
 #' @param fit A fitted \code{ranger} model object.
 #' @param response Character string. The name of the response variable in \code{data}.
 #' @param x_var Character string specifying the name of the predictor variable to plot.
+#' @param x_var_title Character string specifying x-axis title.
 #' @param verbose Logical. If \code{TRUE}, returns a list with both data and plot. 
 #'   If \code{FALSE} (default), returns only the plot.
 #' @param gridsize Integer. Number of points to evaluate in the grid for each variable. Default is 10.
@@ -29,6 +30,8 @@
 #'   Default is 0.5.
 #' @param category_names Character vector of category names for the legend. 
 #'   If NULL, uses default names.
+#' @param category_title Character vector of the legend title. 
+#'   If NULL, no title is shown.
 #' @param title Character string for the plot title. Default is "Partial Dependence 
 #'   Plot with Individual Conditional Expectation Lines".
 #' @param subtitle Character string for the plot subtitle. Default is "Background 
@@ -37,6 +40,7 @@
 #'   Default is 0.4.
 #' @param ice_color Character string specifying the color of ICE lines. Default is "purple".
 #' @param ice_linewidth Numeric value for the width of ICE lines. Default is 0.7.
+#' @param ice_pointsize Numeric value for the size of observed prodiction values. Default is 1.5.
 #' @param pdp_color Character string specifying the color of the PDP mean line and points. 
 #'   Default is "black".
 #' @param pdp_linewidth Numeric value for the width of the PDP mean line. Default is 1.5.
@@ -99,6 +103,7 @@ plot_pdp <- function(data,
                      model,
                      response,
                      x_var,
+                     x_var_title,
                      verbose = FALSE,
                      gridsize = 10,
                      nmax = 500,
@@ -110,11 +115,13 @@ plot_pdp <- function(data,
                      category_colors = NULL,
                      category_alpha = 0.5,
                      category_names = NULL,
-                     title = "Partial Dependence Plot with Individual Conditional Expectation Lines",
+                     category_title = NULL,
+                     title = "Partial Dependence Plot",
                      subtitle = "Background colors show category mapping",
                      ice_alpha = 0.4,
                      ice_color = "purple",
                      ice_linewidth = 0.7,
+                     ice_pointsize = 1.5,
                      pdp_color = "black",
                      pdp_linewidth = 1.5,
                      ridgeline_scale = 0.8,
@@ -235,11 +242,12 @@ plot_pdp <- function(data,
     dplyr::summarise(fit = mean(fit))
   
   # Filter ICE data for selected curves
-  pdp1 <- dplyr::filter(pdp, .data[[".id"]] %in% sice)
+  ice_data_sample <- dplyr::filter(pdp, .data[[".id"]] %in% sice)
   
   # Create data list
   pdp_data_list <- list(
-    ice_data = tibble::as_tibble(pdp1),
+    ice_data = tibble::as_tibble(pdp),
+    ice_data_sample = ice_data_sample,
     pdp_data = tibble::as_tibble(aggr)
   )
   
@@ -249,43 +257,48 @@ plot_pdp <- function(data,
   
   # Extract data from list
   ice_data <- pdp_data_list$ice_data
+  ice_data_sample <- pdp_data_list$ice_data_sample
   pdp_data <- pdp_data_list$pdp_data
   
   # Create color palette if not provided
   if (is.null(category_colors) && !is.null(borders)) {
-    colors <- c('#4DAF4A', '#377EB8', '#FFFF33', '#FF7F00', '#E41A1C')
-    color_palette <- colorRampPalette(colors)
-    category_colors <- color_palette(length(borders) - 1)
+    # colors <- c('#4DAF4A', '#377EB8', '#FFFF33', '#FF7F00', '#E41A1C')
+    # color_palette <- colorRampPalette(colors)
+    # category_colors <- color_palette(length(borders) - 1)
+    category_colors <- paletteer::paletteer_d("PNWColors::Bay",
+                                   n = length(borders) - 1)
   }
   
   # Get limits for y-axis
   if (is.null(limits)) {
     limits <- range(labeling::rpretty(
-      min(c(ice_data$fit, pdp_data$fit)),
-      max(c(ice_data$fit, pdp_data$fit))
+      min(c(ice_data_sample$fit, pdp_data$fit)),
+      max(c(ice_data_sample$fit, pdp_data$fit))
     ))
   }
   
   # Get x-axis range for background rectangles
   if (is_categorical) {
     # For categorical variables, create range based on factor levels
-    if (is.factor(ice_data[[x_var]])) {
-      x_range <- c(0.5, length(levels(ice_data[[x_var]])) + 0.5)
+    if (is.factor(ice_data_sample[[x_var]])) {
+      x_range <- c(0.5, length(levels(ice_data_sample[[x_var]])) + 0.5)
     } else {
       x_range <- c(0.5, unique_values + 0.5)
     }
   } else {
-    x_range <- range(ice_data[[x_var]], na.rm = TRUE)
+    x_range <- range(ice_data_sample[[x_var]], na.rm = TRUE)
   }
   
-  browser()
+  #browser()
+  
+  if (is.null(category_names)) {
+    category_names <- paste0("cat", seq_len(length(borders) - 1))
+  }
   
   # Create background rectangles for cont x_var if borders are provided
   if (!is.null(borders) && !is_categorical) {
     
-    if (is.null(category_names)) {
-      category_names <- paste0("cat", seq_len(length(borders) - 1))
-    }
+  
     
     # Function to create background rectangles
     create_background_rects <- function(borders, x_range) {
@@ -333,7 +346,7 @@ plot_pdp <- function(data,
       # Customize fill colors for background
       scale_fill_manual(
         values = category_colors[1:length(unique(bg_rects$category))],
-        name = "Rating",
+        name = category_title,
         labels = category_names[1:length(unique(bg_rects$category))]
       ) +
       guides(fill = guide_legend(reverse = TRUE))
@@ -343,63 +356,75 @@ plot_pdp <- function(data,
     p <- ggplot()
   }
   
+  browser()
+  
   if (is_categorical) {
     # CATEGORICAL PLOT with ridgelines
     
     # Prepare data for ridgelines - group ICE curves by x_var value
-    ridgeline_data <- ice_data %>%
+    ridgeline_data <- ice_data_sample %>%
       select(all_of(x_var), fit, .id) %>%
       rename(x_value = !!sym(x_var))
-    
-    # # Create the new categorical variable in your data
-    # ridgeline_data$fill_category <- cut(ridgeline_data$fit, breaks = borders, include.lowest = TRUE)
-    # 
-    # p <- ggplot() +
-    #   stat_density_ridges(
-    #     mapping = aes(y = .data$x_value,
-    #                   x = fit,
-    #                   fill = .data$fill_category),
-    #     data = ridgeline_data,
-    #     geom = "density_ridges_gradient",
-    #     #aes(fill = after_stat(x > 1)), # Fill differently for values > 1
-    #     scale = ridgeline_scale,
-    #     alpha = ridgeline_alpha,
-    #     rel_min_height = 0
-    #   ) +
-    #   coord_flip()
-    
-    # Add categorical-specific elements to the plot
-    p <- ggplot() +
-      # Add ridgeline plots for each category
-      geom_vridgeline(data = ridgeline_data,
-                      aes(x = x_value,
-                          y = fit,
-                          width = after_stat(density)),
-                      stat = "ydensity",
-                      trim = FALSE,
-                      scale = ridgeline_scale,
-                      alpha = ridgeline_alpha,
-                      color = "white") +
-      
-      # Add PDP mean points
-      geom_point(
-        data = pdp_data,
-        aes(x = .data[[x_var]], y = fit),
-        color = pdp_color,
-        size = 3,
-        shape = 21,
-        fill = "white",
-        stroke = 2
+
+    p <- ggplot(data = ridgeline_data) +
+      stat_density_ridges(
+        mapping = aes(y = .data$x_value,
+                      x = fit,
+                      fill = after_stat(cut(x, breaks = borders))),
+        geom = "density_ridges_gradient",
+        #aes(fill = after_stat(x > 1)), # Fill differently for values > 1
+        scale = ridgeline_scale,
+        alpha = ridgeline_alpha,
+        rel_min_height = 0,
+        jittered_points = TRUE,
+        #position = position_points_jitter(width = 0.05, height = 0),
+        point_color = ice_color,
+        point_size = ice_pointsize,
+        point_alpha = ice_alpha
       ) +
-      
+      ggdist::stat_pointinterval(
+          point_interval = "mean_qi",
+          data = ice_data %>%
+            select(all_of(x_var), fit, .id) %>%
+            rename(x_value = !!sym(x_var)),
+          mapping = aes(y = .data$x_value,
+                        x = fit),
+          position = position_nudge(y = -0.05),
+          color = pdp_color
+          
+      ) +
+      scale_fill_manual(
+        values = category_colors[1:(length(borders) - 1)],
+        name = category_title,
+        labels = category_names[1:(length(borders) - 1)]
+      ) +
+      guides(fill = guide_legend(reverse = TRUE)) +
       # Labels and theme
       labs(
-        x = x_var, 
-        y = "Latent Score / Category Mapping",
+        y = x_var_title, 
+        x = "Latent Score",
         title = title,
-        subtitle = paste(subtitle, "(Ridgeline plot for categorical variable)")
+        subtitle = subtitle
       ) +
       theme_minimal() +
+      geom_vline(
+        xintercept = borders[!is.infinite(borders)],
+        color = "black",
+        linetype = "dashed",
+        alpha = 0.8
+      ) +
+      coord_flip() +
+      # geom_line(
+      #   data = ice_data %>%
+      #     select(all_of(x_var), fit, .id) %>%
+      #     rename(x_value = !!sym(x_var)) %>%
+      #     group_by(x_value) %>%
+      #     summarise(mean_fit = mean(fit), .groups = "drop"),
+      #   mapping = aes(y = x_value, x = mean_fit),
+      #   color = pdp_color,
+      #   size = 1,
+      #   position = position_nudge(y = -0.05)  # Same nudge as the points
+      # ) +
       theme(
         legend.position = "right",
         panel.grid.minor = element_blank(),
@@ -413,7 +438,7 @@ plot_pdp <- function(data,
     p <- p +
       # Add ICE lines
       geom_line(
-        data = ice_data,
+        data = ice_data_sample,
         aes(x = !!sym(x_var), y = fit, group = .id),
         color = ice_color, 
         alpha = ice_alpha, 
@@ -441,8 +466,8 @@ plot_pdp <- function(data,
       
       # Labels and theme
       labs(
-        x = x_var,
-        y = "Latent Score / Category Mapping",
+        x = x_var_title,
+        y = "Latent Score",
         title = title,
         subtitle = subtitle
       ) +

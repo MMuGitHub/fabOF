@@ -9,6 +9,7 @@ plot_pdp(
   model,
   response,
   x_var,
+  x_var_title,
   verbose = FALSE,
   gridsize = 10,
   nmax = 500,
@@ -20,11 +21,13 @@ plot_pdp(
   category_colors = NULL,
   category_alpha = 0.5,
   category_names = NULL,
-  title = "Partial Dependence Plot with Individual Conditional Expectation Lines",
+  category_title = NULL,
+  title = "Partial Dependence Plot",
   subtitle = "Background colors show category mapping",
   ice_alpha = 0.4,
   ice_color = "purple",
   ice_linewidth = 0.7,
+  ice_pointsize = 1.5,
   pdp_color = "black",
   pdp_linewidth = 1.5,
   ridgeline_scale = 0.8,
@@ -37,6 +40,8 @@ plot_pdp(
 \item{response}{Character string. The name of the response variable in \code{data}.}
 
 \item{x_var}{Character string specifying the name of the predictor variable to plot.}
+
+\item{x_var_title}{Character string specifying x-axis title.}
 
 \item{verbose}{Logical. If \code{TRUE}, returns a list with both data and plot. 
 If \code{FALSE} (default), returns only the plot.}
@@ -67,6 +72,9 @@ Default is 0.5.}
 \item{category_names}{Character vector of category names for the legend. 
 If NULL, uses default names.}
 
+\item{category_title}{Character vector of the legend title. 
+If NULL, no title is shown.}
+
 \item{title}{Character string for the plot title. Default is "Partial Dependence 
 Plot with Individual Conditional Expectation Lines".}
 
@@ -79,6 +87,8 @@ Default is 0.4.}
 \item{ice_color}{Character string specifying the color of ICE lines. Default is "purple".}
 
 \item{ice_linewidth}{Numeric value for the width of ICE lines. Default is 0.7.}
+
+\item{ice_pointsize}{Numeric value for the size of observed prodiction values. Default is 1.5.}
 
 \item{pdp_color}{Character string specifying the color of the PDP mean line and points. 
 Default is "black".}
@@ -106,7 +116,7 @@ expectation (ICE) lines for ordinal random forest models. It automatically detec
 whether the predictor variable is continuous or categorical and creates appropriate 
 visualizations. For continuous variables, it shows ICE lines with optional category 
 background mapping. For categorical variables, it creates ridgeline plots showing 
-the distribution of predictions for each category.
+the distribution of predictions for each category. test
 }
 \details{
 The function automatically detects the variable type based on the original data:
