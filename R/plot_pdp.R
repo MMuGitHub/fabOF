@@ -280,8 +280,8 @@ plot_pdp <- function(data,
   
   browser()
   
-  # Create background rectangles if borders are provided
-  if (!is.null(borders)) {
+  # Create background rectangles for cont x_var if borders are provided
+  if (!is.null(borders) && !is_categorical) {
     
     if (is.null(category_names)) {
       category_names <- paste0("cat", seq_len(length(borders) - 1))
@@ -351,8 +351,25 @@ plot_pdp <- function(data,
       select(all_of(x_var), fit, .id) %>%
       rename(x_value = !!sym(x_var))
     
+    # # Create the new categorical variable in your data
+    # ridgeline_data$fill_category <- cut(ridgeline_data$fit, breaks = borders, include.lowest = TRUE)
+    # 
+    # p <- ggplot() +
+    #   stat_density_ridges(
+    #     mapping = aes(y = .data$x_value,
+    #                   x = fit,
+    #                   fill = .data$fill_category),
+    #     data = ridgeline_data,
+    #     geom = "density_ridges_gradient",
+    #     #aes(fill = after_stat(x > 1)), # Fill differently for values > 1
+    #     scale = ridgeline_scale,
+    #     alpha = ridgeline_alpha,
+    #     rel_min_height = 0
+    #   ) +
+    #   coord_flip()
+    
     # Add categorical-specific elements to the plot
-    p <- p +
+    p <- ggplot() +
       # Add ridgeline plots for each category
       geom_vridgeline(data = ridgeline_data,
                       aes(x = x_value,
