@@ -51,11 +51,9 @@
 #' @param pdp_meanfill Character string specifying the fill color of the point for the PDP mean.
 #'  Default is "black".
 #' @param pdp_meanshape Numeric value for the shape of the point for the PDP mean. Default is 16.
-#' @param obscolor Character string for the color of observed prediction points. Default is "grey".
+#' @param obs_color Character string for the color of observed prediction points. Default is "grey".
 #' @param ridgeline_scale Numeric value controlling the height scaling of ridgeline
 #'  plots for categorical variables. Default is 0.8.
-#' @param ridgeline_alpha Numeric value between 0 and 1 for ridgeline transparency
-#'  in categorical plots. Default is 0.7.
 #' @param show_vertical_lines Logical. If \code{TRUE}, adds vertical dashed lines at the category borders. Default is \code{TRUE}.
 #'
 #' @return If \code{verbose = FALSE}, returns a ggplot object. If \code{verbose = TRUE},
@@ -128,17 +126,19 @@ plot_pdp <- function(data,
                      title = "Partial Dependence Plot",
                      subtitle = "Background colors show category mapping",
                      ice_alpha = 0.4,
-                     ice_linecolor = "purple",
+                     ice_linecolor = "#008080",
                      ice_linewidth = 0.7,
-                     ice_pointsize = 1.5,
+                     ice_pointsize = 3,
                      pdp_linecolor = "black",
                      pdp_linewidth = 1.5,
                      pdp_intervalcolor = "black",
-                     pdp_meancolor = "black",
+                     pdp_meancolor = "#008080",
                      pdp_meanfill = "black",
                      pdp_meanshape = 23,
-                     obscolor = "grey",
+                     obs_color = "black",
+                     obs_shape = 4,
                      ridgeline_scale = 0.8,
+                     ridgeline_color = "lightgrey",
                      show_vertical_lines = TRUE
                      ) {
   
@@ -390,10 +390,11 @@ plot_pdp <- function(data,
                       fill = after_stat(cut(x, breaks = borders))),
         geom = "density_ridges_gradient",
         scale = ridgeline_scale,
-        alpha = ridgeline_alpha,
         rel_min_height = 0,
+        color = ridgeline_color,
         jittered_points = TRUE,
-        point_color = obscolor,
+        point_color = obs_color,
+        point_shape = obs_shape,
         point_size = ice_pointsize,
         point_alpha = ice_alpha
       ) +
@@ -405,7 +406,7 @@ plot_pdp <- function(data,
           mapping = aes(y = .data$x_value,
                         x = fit),
           position = position_nudge(y = -0.05),
-          color = obscolor,
+          color = obs_color,
           shape = pdp_meanshape,
           interval_color = pdp_intervalcolor,
           point_color = pdp_meancolor,
@@ -413,7 +414,8 @@ plot_pdp <- function(data,
           
       ) +
       scale_fill_manual(
-        values = category_colors[1:(length(borders) - 1)],
+        values = scales::alpha(category_colors[1:(length(borders) - 1)],
+                               alpha = category_alpha),
         name = category_title,
         labels = category_names[1:(length(borders) - 1)]
       ) +
