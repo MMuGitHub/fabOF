@@ -1,10 +1,10 @@
 #' Create Partial Dependence Plot with Individual Conditional Expectation Lines
 #'
-#' This function creates partial dependence plots (PDP) with individual conditional 
-#' expectation (ICE) lines for ordinal random forest models. It automatically detects 
-#' whether the predictor variable is continuous or categorical and creates appropriate 
-#' visualizations. For continuous variables, it shows ICE lines with optional category 
-#' background mapping. For categorical variables, it creates ridgeline plots showing 
+#' This function creates partial dependence plots (PDP) with individual conditional
+#' expectation (ICE) lines for ordinal random forest models. It automatically detects
+#' whether the predictor variable is continuous or categorical and creates appropriate
+#' visualizations. For continuous variables, it shows ICE lines with optional category
+#' background mapping. For categorical variables, it creates ridgeline plots showing
 #' the distribution of predictions for each category. test
 #'
 #' @param data A data frame containing the predictor variables and the response.
@@ -12,80 +12,89 @@
 #' @param response Character string. The name of the response variable in \code{data}.
 #' @param x_var Character string specifying the name of the predictor variable to plot.
 #' @param x_var_title Character string specifying x-axis title.
-#' @param verbose Logical. If \code{TRUE}, returns a list with both data and plot. 
-#'   If \code{FALSE} (default), returns only the plot.
+#' @param verbose Logical. If \code{TRUE}, returns a list with both data and plot.
+#'  If \code{FALSE} (default), returns only the plot.
 #' @param gridsize Integer. Number of points to evaluate in the grid for each variable. Default is 10.
 #' @param nmax Integer. Maximum number of rows sampled from \code{data} for ICE computation. Default is 500.
-#' @param nIce Integer or integer vector. If a single integer, 
-#' specifies the number of ICE curves to sample randomly (default is 30). 
+#' @param nIce Integer or integer vector. If a single integer,
+#' specifies the number of ICE curves to sample randomly (default is 30).
 #' If a vector of integers, specifies the exact row indices of observations to use for ICE curves.
 #' @param limits Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.
 #' @param colorVar Optional variable name for colouring ICE curves (instead of prediction values).
 #' @param probability Logical. Whether to use probability predictions. Default is \code{FALSE}.
-#' @param borders Numeric vector of category borders for continuous variables. 
-#'   If NULL, no background category mapping is shown. Default is NULL.
-#' @param category_colors Character vector of colors for category backgrounds. 
-#'   If NULL, uses default color palette.
-#' @param category_alpha Numeric value between 0 and 1 for category background transparency. 
-#'   Default is 0.5.
-#' @param category_names Character vector of category names for the legend. 
-#'   If NULL, uses default names.
-#' @param category_title Character vector of the legend title. 
-#'   If NULL, no title is shown.
-#' @param title Character string for the plot title. Default is "Partial Dependence 
-#'   Plot with Individual Conditional Expectation Lines".
-#' @param subtitle Character string for the plot subtitle. Default is "Background 
-#'   colors show category mapping".
-#' @param ice_alpha Numeric value between 0 and 1 for ICE line transparency. 
-#'   Default is 0.4.
-#' @param ice_color Character string specifying the color of ICE lines. Default is "purple".
+#' @param borders Numeric vector of category borders for continuous variables.
+#'  If NULL, no background category mapping is shown. Default is NULL.
+#' @param category_colors Character vector of colors for category backgrounds.
+#'  If NULL, uses default color palette.
+#' @param category_alpha Numeric value between 0 and 1 for category background transparency.
+#'  Default is 0.5.
+#' @param category_names Character vector of category names for the legend.
+#'  If NULL, uses default names.
+#' @param category_title Character vector of the legend title.
+#'  If NULL, no title is shown.
+#' @param title Character string for the plot title. Default is "Partial Dependence
+#'  Plot with Individual Conditional Expectation Lines".
+#' @param subtitle Character string for the plot subtitle. Default is "Background
+#'  colors show category mapping".
+#' @param ice_alpha Numeric value between 0 and 1 for ICE line transparency.
+#'  Default is 0.4.
+#' @param ice_linecolor Character string specifying the color of ICE lines. Default is "purple".
 #' @param ice_linewidth Numeric value for the width of ICE lines. Default is 0.7.
 #' @param ice_pointsize Numeric value for the size of observed prodiction values. Default is 1.5.
-#' @param pdp_color Character string specifying the color of the PDP mean line and points. 
-#'   Default is "black".
+#' @param pdp_linecolor Character string specifying the color of the PDP mean line.
+#'  Default is "black".
 #' @param pdp_linewidth Numeric value for the width of the PDP mean line. Default is 1.5.
-#' @param ridgeline_scale Numeric value controlling the height scaling of ridgeline 
-#'   plots for categorical variables. Default is 0.8.
-#' @param ridgeline_alpha Numeric value between 0 and 1 for ridgeline transparency 
-#'   in categorical plots. Default is 0.7.
+#' @param pdp_intervalcolor Character string specifying the color of the interval lines for the PDP mean.
+#'  Default is "black".
+#' @param pdp_meancolor Character string specifying the color of the point's outline for the PDP mean.
+#'  Default is "black".
+#' @param pdp_meanfill Character string specifying the fill color of the point for the PDP mean.
+#'  Default is "black".
+#' @param pdp_meanshape Numeric value for the shape of the point for the PDP mean. Default is 16.
+#' @param obscolor Character string for the color of observed prediction points. Default is "grey".
+#' @param ridgeline_scale Numeric value controlling the height scaling of ridgeline
+#'  plots for categorical variables. Default is 0.8.
+#' @param ridgeline_alpha Numeric value between 0 and 1 for ridgeline transparency
+#'  in categorical plots. Default is 0.7.
+#' @param show_vertical_lines Logical. If \code{TRUE}, adds vertical dashed lines at the category borders. Default is \code{TRUE}.
 #'
-#' @return If \code{verbose = FALSE}, returns a ggplot object. If \code{verbose = TRUE}, 
-#'   returns a list with elements:
-#'   \item{plot}{The ggplot object}
-#'   \item{data}{List containing ice_data and pdp_data tibbles}
-#'   \item{variable_type}{Character indicating whether variable was treated as "categorical" or "continuous"}
+#' @return If \code{verbose = FALSE}, returns a ggplot object. If \code{verbose = TRUE},
+#'  returns a list with elements:
+#'  \item{plot}{The ggplot object}
+#'  \item{data}{List containing ice_data and pdp_data tibbles}
+#'  \item{variable_type}{Character indicating whether variable was treated as "categorical" or "continuous"}
 #'
 #' @details
 #' The function automatically detects the variable type based on the original data:
 #' \itemize{
-#'   \item \strong{Categorical treatment}: Variables are treated as categorical if they are 
-#'     factors, characters, or have 4 or fewer unique values. A warning is displayed 
-#'     when numeric variables are treated as categorical due to having few unique values.
-#'   \item \strong{Continuous variables}: Creates a traditional PDP with ICE lines, 
-#'     PDP mean line, and optional category background mapping using the \code{borders} parameter.
-#'   \item \strong{Categorical variables}: Creates ridgeline plots showing the 
-#'     distribution of ICE predictions for each category level, with PDP mean points.
+#'  \item \strong{Categorical treatment}: Variables are treated as categorical if they are
+#'   factors, characters, or have 4 or fewer unique values. A warning is displayed
+#'   when numeric variables are treated as categorical due to having few unique values.
+#'  \item \strong{Continuous variables}: Creates a traditional PDP with ICE lines,
+#'   PDP mean line, and optional category background mapping using the \code{borders} parameter.
+#'  \item \strong{Categorical variables}: Creates ridgeline plots showing the
+#'   distribution of ICE predictions for each category level, with PDP mean points.
 #' }
 #'
 #' @examples
 #' \dontrun{
 #' # Basic usage - just get the plot
 #' plot <- plot_pdp(
-#'   data = dm_train_dummy, 
-#'   fit = rf_ord_dummy$ranger.fit,
-#'   response = "score",
-#'   var = "item01"
+#'  data = dm_train_dummy,
+#'  fit = rf_ord_dummy$ranger.fit,
+#'  response = "score",
+#'  var = "item01"
 #' )
-#' 
+#'
 #' # Verbose usage - get plot, data, and variable type info
 #' result <- plot_pdp(
-#'   data = dm_train_dummy, 
-#'   fit = rf_ord_dummy$ranger.fit,
-#'   response = "score",
-#'   var = "item01",
-#'   verbose = TRUE
+#'  data = dm_train_dummy,
+#'  fit = rf_ord_dummy$ranger.fit,
+#'  response = "score",
+#'  var = "item01",
+#'  verbose = TRUE
 #' )
-#' 
+#'
 #' print(result$plot)
 #' head(result$data$ice_data)
 #' }
@@ -119,13 +128,19 @@ plot_pdp <- function(data,
                      title = "Partial Dependence Plot",
                      subtitle = "Background colors show category mapping",
                      ice_alpha = 0.4,
-                     ice_color = "purple",
+                     ice_linecolor = "purple",
                      ice_linewidth = 0.7,
                      ice_pointsize = 1.5,
-                     pdp_color = "black",
+                     pdp_linecolor = "black",
                      pdp_linewidth = 1.5,
+                     pdp_intervalcolor = "black",
+                     pdp_meancolor = "black",
+                     pdp_meanfill = "black",
+                     pdp_meanshape = 23,
+                     obscolor = "grey",
                      ridgeline_scale = 0.8,
-                     ridgeline_alpha = 0.7) {
+                     show_vertical_lines = TRUE
+                     ) {
   
   # Load required libraries
   require(ggplot2)
@@ -334,15 +349,6 @@ plot_pdp <- function(data,
             fill = factor(category)),
         alpha = category_alpha
       ) +
-      
-      # Add horizontal lines for borders (excluding -Inf and Inf)
-      geom_hline(
-        yintercept = borders[!is.infinite(borders)],
-        color = "black", 
-        linetype = "dashed", 
-        alpha = 0.8
-      ) +
-      
       # Customize fill colors for background
       scale_fill_manual(
         values = category_colors[1:length(unique(bg_rects$category))],
@@ -351,12 +357,23 @@ plot_pdp <- function(data,
       ) +
       guides(fill = guide_legend(reverse = TRUE))
     
+    if (show_vertical_lines) {
+            # Add horizontal lines for borders (excluding -Inf and Inf)
+      p <- p +
+        geom_hline(
+          yintercept = borders[!is.infinite(borders)],
+          color = "black", 
+          linetype = "dashed", 
+          alpha = 0.8
+        )
+    }
+    
   } else {
     # Create base plot without background
     p <- ggplot()
   }
   
-  browser()
+  #browser()
   
   if (is_categorical) {
     # CATEGORICAL PLOT with ridgelines
@@ -372,25 +389,27 @@ plot_pdp <- function(data,
                       x = fit,
                       fill = after_stat(cut(x, breaks = borders))),
         geom = "density_ridges_gradient",
-        #aes(fill = after_stat(x > 1)), # Fill differently for values > 1
         scale = ridgeline_scale,
         alpha = ridgeline_alpha,
         rel_min_height = 0,
         jittered_points = TRUE,
-        #position = position_points_jitter(width = 0.05, height = 0),
-        point_color = ice_color,
+        point_color = obscolor,
         point_size = ice_pointsize,
         point_alpha = ice_alpha
       ) +
       ggdist::stat_pointinterval(
-          point_interval = "mean_qi",
           data = ice_data %>%
             select(all_of(x_var), fit, .id) %>%
             rename(x_value = !!sym(x_var)),
+          point_interval = "mean_qi",
           mapping = aes(y = .data$x_value,
                         x = fit),
           position = position_nudge(y = -0.05),
-          color = pdp_color
+          color = obscolor,
+          shape = pdp_meanshape,
+          interval_color = pdp_intervalcolor,
+          point_color = pdp_meancolor,
+          point_fill = pdp_meanfill
           
       ) +
       scale_fill_manual(
@@ -398,7 +417,15 @@ plot_pdp <- function(data,
         name = category_title,
         labels = category_names[1:(length(borders) - 1)]
       ) +
-      guides(fill = guide_legend(reverse = TRUE)) +
+      guides(fill = guide_legend(
+        reverse = TRUE,
+        # Override the point aesthetics in the legend
+        override.aes = list(
+          point_color = NA, 
+          point_size = NA, 
+          point_alpha = NA
+        )
+      )) +
       # Labels and theme
       labs(
         y = x_var_title, 
@@ -407,12 +434,6 @@ plot_pdp <- function(data,
         subtitle = subtitle
       ) +
       theme_minimal() +
-      geom_vline(
-        xintercept = borders[!is.infinite(borders)],
-        color = "black",
-        linetype = "dashed",
-        alpha = 0.8
-      ) +
       coord_flip() +
       # geom_line(
       #   data = ice_data %>%
@@ -430,6 +451,15 @@ plot_pdp <- function(data,
         panel.grid.minor = element_blank(),
         panel.grid.major = element_line(color = "gray90", size = 0.5)
       )
+    if (show_vertical_lines) {
+      p <- p +
+        geom_vline(
+          xintercept = borders[!is.infinite(borders)],
+          color = "black",
+          linetype = "dashed",
+          alpha = 0.8
+        )
+    }
     
   } else {
     # CONTINUOUS PLOT with ICE lines and PDP
@@ -440,7 +470,7 @@ plot_pdp <- function(data,
       geom_line(
         data = ice_data_sample,
         aes(x = !!sym(x_var), y = fit, group = .id),
-        color = ice_color, 
+        color = ice_linecolor, 
         alpha = ice_alpha, 
         linewidth = ice_linewidth
       ) +
@@ -449,7 +479,7 @@ plot_pdp <- function(data,
       geom_line(
         data = pdp_data, 
         aes(x = !!sym(x_var), y = fit),
-        color = pdp_color, 
+        color = pdp_linecolor, 
         linewidth = pdp_linewidth
       ) +
       
@@ -457,7 +487,7 @@ plot_pdp <- function(data,
       geom_point(
         data = pdp_data,
         aes(x = !!sym(x_var), y = fit),
-        color = pdp_color, 
+        color = pdp_meancolor, 
         size = 2
       ) +
       

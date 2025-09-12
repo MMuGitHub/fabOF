@@ -25,13 +25,18 @@ plot_pdp(
   title = "Partial Dependence Plot",
   subtitle = "Background colors show category mapping",
   ice_alpha = 0.4,
-  ice_color = "purple",
+  ice_linecolor = "purple",
   ice_linewidth = 0.7,
   ice_pointsize = 1.5,
-  pdp_color = "black",
+  pdp_linecolor = "black",
   pdp_linewidth = 1.5,
+  pdp_intervalcolor = "black",
+  pdp_meancolor = "black",
+  pdp_meanfill = "black",
+  pdp_meanshape = 23,
+  obscolor = "grey",
   ridgeline_scale = 0.8,
-  ridgeline_alpha = 0.7
+  show_vertical_lines = TRUE
 )
 }
 \arguments{
@@ -43,15 +48,15 @@ plot_pdp(
 
 \item{x_var_title}{Character string specifying x-axis title.}
 
-\item{verbose}{Logical. If \code{TRUE}, returns a list with both data and plot. 
+\item{verbose}{Logical. If \code{TRUE}, returns a list with both data and plot.
 If \code{FALSE} (default), returns only the plot.}
 
 \item{gridsize}{Integer. Number of points to evaluate in the grid for each variable. Default is 10.}
 
 \item{nmax}{Integer. Maximum number of rows sampled from \code{data} for ICE computation. Default is 500.}
 
-\item{nIce}{Integer or integer vector. If a single integer, 
-specifies the number of ICE curves to sample randomly (default is 30). 
+\item{nIce}{Integer or integer vector. If a single integer,
+specifies the number of ICE curves to sample randomly (default is 30).
 If a vector of integers, specifies the exact row indices of observations to use for ICE curves.}
 
 \item{limits}{Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.}
@@ -60,93 +65,105 @@ If a vector of integers, specifies the exact row indices of observations to use 
 
 \item{probability}{Logical. Whether to use probability predictions. Default is \code{FALSE}.}
 
-\item{borders}{Numeric vector of category borders for continuous variables. 
+\item{borders}{Numeric vector of category borders for continuous variables.
 If NULL, no background category mapping is shown. Default is NULL.}
 
-\item{category_colors}{Character vector of colors for category backgrounds. 
+\item{category_colors}{Character vector of colors for category backgrounds.
 If NULL, uses default color palette.}
 
-\item{category_alpha}{Numeric value between 0 and 1 for category background transparency. 
+\item{category_alpha}{Numeric value between 0 and 1 for category background transparency.
 Default is 0.5.}
 
-\item{category_names}{Character vector of category names for the legend. 
+\item{category_names}{Character vector of category names for the legend.
 If NULL, uses default names.}
 
-\item{category_title}{Character vector of the legend title. 
+\item{category_title}{Character vector of the legend title.
 If NULL, no title is shown.}
 
-\item{title}{Character string for the plot title. Default is "Partial Dependence 
+\item{title}{Character string for the plot title. Default is "Partial Dependence
 Plot with Individual Conditional Expectation Lines".}
 
-\item{subtitle}{Character string for the plot subtitle. Default is "Background 
+\item{subtitle}{Character string for the plot subtitle. Default is "Background
 colors show category mapping".}
 
-\item{ice_alpha}{Numeric value between 0 and 1 for ICE line transparency. 
+\item{ice_alpha}{Numeric value between 0 and 1 for ICE line transparency.
 Default is 0.4.}
 
-\item{ice_color}{Character string specifying the color of ICE lines. Default is "purple".}
+\item{ice_linecolor}{Character string specifying the color of ICE lines. Default is "purple".}
 
 \item{ice_linewidth}{Numeric value for the width of ICE lines. Default is 0.7.}
 
 \item{ice_pointsize}{Numeric value for the size of observed prodiction values. Default is 1.5.}
 
-\item{pdp_color}{Character string specifying the color of the PDP mean line and points. 
+\item{pdp_linecolor}{Character string specifying the color of the PDP mean line.
 Default is "black".}
 
 \item{pdp_linewidth}{Numeric value for the width of the PDP mean line. Default is 1.5.}
 
-\item{ridgeline_scale}{Numeric value controlling the height scaling of ridgeline 
+\item{pdp_intervalcolor}{Character string specifying the color of the interval lines for the PDP mean.
+Default is "black".}
+
+\item{pdp_meancolor}{Character string specifying the color of the point's outline for the PDP mean.
+Default is "black".}
+
+\item{pdp_meanfill}{Character string specifying the fill color of the point for the PDP mean.
+Default is "black".}
+
+\item{pdp_meanshape}{Numeric value for the shape of the point for the PDP mean. Default is 16.}
+
+\item{obscolor}{Character string for the color of observed prediction points. Default is "grey".}
+
+\item{ridgeline_scale}{Numeric value controlling the height scaling of ridgeline
 plots for categorical variables. Default is 0.8.}
 
-\item{ridgeline_alpha}{Numeric value between 0 and 1 for ridgeline transparency 
-in categorical plots. Default is 0.7.}
+\item{show_vertical_lines}{Logical. If \code{TRUE}, adds vertical dashed lines at the category borders. Default is \code{TRUE}.}
 
 \item{fit}{A fitted \code{ranger} model object.}
 }
 \value{
-If \code{verbose = FALSE}, returns a ggplot object. If \code{verbose = TRUE}, 
-  returns a list with elements:
-  \item{plot}{The ggplot object}
-  \item{data}{List containing ice_data and pdp_data tibbles}
-  \item{variable_type}{Character indicating whether variable was treated as "categorical" or "continuous"}
+If \code{verbose = FALSE}, returns a ggplot object. If \code{verbose = TRUE},
+ returns a list with elements:
+ \item{plot}{The ggplot object}
+ \item{data}{List containing ice_data and pdp_data tibbles}
+ \item{variable_type}{Character indicating whether variable was treated as "categorical" or "continuous"}
 }
 \description{
-This function creates partial dependence plots (PDP) with individual conditional 
-expectation (ICE) lines for ordinal random forest models. It automatically detects 
-whether the predictor variable is continuous or categorical and creates appropriate 
-visualizations. For continuous variables, it shows ICE lines with optional category 
-background mapping. For categorical variables, it creates ridgeline plots showing 
+This function creates partial dependence plots (PDP) with individual conditional
+expectation (ICE) lines for ordinal random forest models. It automatically detects
+whether the predictor variable is continuous or categorical and creates appropriate
+visualizations. For continuous variables, it shows ICE lines with optional category
+background mapping. For categorical variables, it creates ridgeline plots showing
 the distribution of predictions for each category. test
 }
 \details{
 The function automatically detects the variable type based on the original data:
 \itemize{
-  \item \strong{Categorical treatment}: Variables are treated as categorical if they are 
-    factors, characters, or have 4 or fewer unique values. A warning is displayed 
-    when numeric variables are treated as categorical due to having few unique values.
-  \item \strong{Continuous variables}: Creates a traditional PDP with ICE lines, 
-    PDP mean line, and optional category background mapping using the \code{borders} parameter.
-  \item \strong{Categorical variables}: Creates ridgeline plots showing the 
-    distribution of ICE predictions for each category level, with PDP mean points.
+ \item \strong{Categorical treatment}: Variables are treated as categorical if they are
+  factors, characters, or have 4 or fewer unique values. A warning is displayed
+  when numeric variables are treated as categorical due to having few unique values.
+ \item \strong{Continuous variables}: Creates a traditional PDP with ICE lines,
+  PDP mean line, and optional category background mapping using the \code{borders} parameter.
+ \item \strong{Categorical variables}: Creates ridgeline plots showing the
+  distribution of ICE predictions for each category level, with PDP mean points.
 }
 }
 \examples{
 \dontrun{
 # Basic usage - just get the plot
 plot <- plot_pdp(
-  data = dm_train_dummy, 
-  fit = rf_ord_dummy$ranger.fit,
-  response = "score",
-  var = "item01"
+ data = dm_train_dummy,
+ fit = rf_ord_dummy$ranger.fit,
+ response = "score",
+ var = "item01"
 )
 
 # Verbose usage - get plot, data, and variable type info
 result <- plot_pdp(
-  data = dm_train_dummy, 
-  fit = rf_ord_dummy$ranger.fit,
-  response = "score",
-  var = "item01",
-  verbose = TRUE
+ data = dm_train_dummy,
+ fit = rf_ord_dummy$ranger.fit,
+ response = "score",
+ var = "item01",
+ verbose = TRUE
 )
 
 print(result$plot)
