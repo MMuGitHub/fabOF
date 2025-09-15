@@ -126,11 +126,11 @@ plot_pdp <- function(data,
                      title = "Partial Dependence Plot",
                      subtitle = "Background colors show category mapping",
                      ice_alpha = 0.4,
-                     ice_linecolor = "#008080",
-                     ice_linewidth = 0.7,
+                     ice_linecolor = "lightgrey",
+                     ice_linewidth = 0.5,
                      ice_pointsize = 3,
-                     pdp_linecolor = "black",
-                     pdp_linewidth = 1.5,
+                     pdp_linecolor = "#008080",
+                     pdp_linewidth = 0.5,
                      pdp_intervalcolor = "black",
                      pdp_meancolor = "#008080",
                      pdp_meanfill = "black",
@@ -259,6 +259,27 @@ plot_pdp <- function(data,
   # Filter ICE data for selected curves
   ice_data_sample <- dplyr::filter(pdp, .data[[".id"]] %in% sice)
   
+  # Here run a seperate prediction with the actually observed data to get the
+  # observed prediction values for the sampled ICE curves:
+  
+  # Get the original data for the sampled ICE curves
+  observed_data <- data_clean[sice[-1], , drop = FALSE]  # Remove NA from sice
+  observed_data$.id <- sice[-1]  # Add .id column to match ice_data_sample
+  
+  # Predict on observed data
+  observed_data$fit <- suppressWarnings(predict(object = model,
+                               newdata = observed_data,
+                               type = "latent"))
+  
+  # Keep only the relevant columns for merging
+  observed_predictions <- observed_data %>%
+    select(.id, !!sym(x_var), fit) %>%
+    rename(observed_fit = fit, observed_x = !!sym(x_var))
+  
+  # Merge observed predictions with ICE data sample
+  ice_data_sample <- ice_data_sample %>%
+    left_join(observed_predictions, by = ".id")
+  
   # Create data list
   pdp_data_list <- list(
     ice_data = tibble::as_tibble(pdp),
@@ -376,16 +397,28 @@ plot_pdp <- function(data,
   #browser()
   
   if (is_categorical) {
-    # CATEGORICAL PLOT with ridgelines
+    # Convert factor to numeric while preserving original factor levels for labeling
+    factor_levels <- levels(ice_data_sample[[x_var]])
+    factor_labels <- factor_levels  # Store original labels
     
+    # Convert factor to numeric in the data
+    ice_data_sample_numeric <- ice_data_sample %>%
+      mutate(!!sym(x_var) := as.numeric(!!sym(x_var)))
+    
+    ice_data_numeric <- ice_data %>%
+      mutate(!!sym(x_var) := as.numeric(!!sym(x_var)))
+    
+    # CATEGORICAL PLOT with ridgelines (now using numeric values)
     # Prepare data for ridgelines - group ICE curves by x_var value
-    ridgeline_data <- ice_data_sample %>%
+    ridgeline_data <- ice_data_sample_numeric %>%
       select(all_of(x_var), fit, .id) %>%
       rename(x_value = !!sym(x_var))
-
+    
     p <- ggplot(data = ridgeline_data) +
       stat_density_ridges(
-        mapping = aes(y = .data$x_value,
+        mapping = aes(
+          y = .data$x_value,
+          group = .data$x_value,
                       x = fit,
                       fill = after_stat(cut(x, breaks = borders))),
         geom = "density_ridges_gradient",
@@ -398,20 +431,32 @@ plot_pdp <- function(data,
         point_size = ice_pointsize,
         point_alpha = ice_alpha
       ) +
+      # Add line connecting the mean values
+      geom_line(
+        data = ice_data_numeric %>%
+          select(all_of(x_var), fit, .id) %>%
+          rename(x_value = !!sym(x_var)) %>%
+          group_by(x_value) %>%
+          summarise(mean_fit = mean(fit), .groups = "drop"),
+        mapping = aes(y = x_value, x = mean_fit),
+        color = pdp_meancolor,  # Use same color as the mean points
+        size = pdp_linewidth,
+        position = position_nudge(y = -0.05)  # Same nudge as the points
+      ) +
       ggdist::stat_pointinterval(
-          data = ice_data %>%
-            select(all_of(x_var), fit, .id) %>%
-            rename(x_value = !!sym(x_var)),
-          point_interval = "mean_qi",
-          mapping = aes(y = .data$x_value,
-                        x = fit),
-          position = position_nudge(y = -0.05),
-          color = obs_color,
-          shape = pdp_meanshape,
-          interval_color = pdp_intervalcolor,
-          point_color = pdp_meancolor,
-          point_fill = pdp_meanfill
-          
+        data = ice_data_numeric %>%
+          select(all_of(x_var), fit, .id) %>%
+          rename(x_value = !!sym(x_var)),
+        point_interval = "mean_qi",
+        mapping = aes(y = .data$x_value,
+                      group = .data$x_value,
+                      x = fit),
+        position = position_nudge(y = -0.05),
+        color = obs_color,
+        shape = pdp_meanshape,
+        interval_color = pdp_intervalcolor,
+        point_color = pdp_meancolor,
+        point_fill = pdp_meanfill         
       ) +
       scale_fill_manual(
         values = scales::alpha(category_colors[1:(length(borders) - 1)],
@@ -419,40 +464,35 @@ plot_pdp <- function(data,
         name = category_title,
         labels = category_names[1:(length(borders) - 1)]
       ) +
+      # Add scale_y_continuous to restore original factor labels
+      scale_y_continuous(
+        breaks = seq_along(factor_levels),
+        labels = factor_labels,
+        name = x_var_title
+      ) +
       guides(fill = guide_legend(
         reverse = TRUE,
         # Override the point aesthetics in the legend
         override.aes = list(
           point_color = NA, 
-          point_size = NA, 
+          point_size = NA,
           point_alpha = NA
         )
       )) +
       # Labels and theme
       labs(
-        y = x_var_title, 
         x = "Latent Score",
         title = title,
         subtitle = subtitle
       ) +
       theme_minimal() +
       coord_flip() +
-      # geom_line(
-      #   data = ice_data %>%
-      #     select(all_of(x_var), fit, .id) %>%
-      #     rename(x_value = !!sym(x_var)) %>%
-      #     group_by(x_value) %>%
-      #     summarise(mean_fit = mean(fit), .groups = "drop"),
-      #   mapping = aes(y = x_value, x = mean_fit),
-      #   color = pdp_color,
-      #   size = 1,
-      #   position = position_nudge(y = -0.05)  # Same nudge as the points
-      # ) +
       theme(
         legend.position = "right",
         panel.grid.minor = element_blank(),
         panel.grid.major = element_line(color = "gray90", size = 0.5)
       )
+    
     if (show_vertical_lines) {
       p <- p +
         geom_vline(
@@ -462,10 +502,9 @@ plot_pdp <- function(data,
           alpha = 0.8
         )
     }
-    
   } else {
     # CONTINUOUS PLOT with ICE lines and PDP
-    
+    #browser()
     # Add continuous-specific elements to the plot
     p <- p +
       # Add ICE lines
@@ -485,12 +524,15 @@ plot_pdp <- function(data,
         linewidth = pdp_linewidth
       ) +
       
-      # Add PDP points
+      # Add observed predictions as points
       geom_point(
-        data = pdp_data,
-        aes(x = !!sym(x_var), y = fit),
-        color = pdp_meancolor, 
-        size = 2
+        data = ice_data_sample %>%
+          filter(!is.na(observed_fit)),  # Only plot where observed data exists
+        aes(x = observed_x, y = observed_fit),
+        color = obs_color,
+        shape = obs_shape,
+        size = ice_pointsize,
+        alpha = 1  # Full opacity for observed points to make them stand out
       ) +
       
       # Set axis limits
