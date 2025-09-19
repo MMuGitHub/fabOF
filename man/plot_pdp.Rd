@@ -17,7 +17,7 @@ plot_pdp(
   limits = NULL,
   colorVar = NULL,
   probability = FALSE,
-  borders = NULL,
+  borders = "none",
   category_colors = NULL,
   category_alpha = 0.5,
   category_names = NULL,
@@ -67,8 +67,10 @@ If a vector of integers, specifies the exact row indices of observations to use 
 
 \item{probability}{Logical. Whether to use probability predictions. Default is \code{FALSE}.}
 
-\item{borders}{Numeric vector of category borders for continuous variables.
-If NULL, no background category mapping is shown. Default is NULL.}
+\item{borders}{Either a numeric vector of category borders or the string "auto" or "none".
+If numeric vector, specifies the borders for category background mapping. If "auto" (default), uses
+the model's category borders. If "none", no background mapping is shown.
+Default is "auto".}
 
 \item{category_colors}{Character vector of colors for category backgrounds.
 If NULL, uses default color palette.}

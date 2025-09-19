@@ -22,8 +22,10 @@
 #' @param limits Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.
 #' @param colorVar Optional variable name for colouring ICE curves (instead of prediction values).
 #' @param probability Logical. Whether to use probability predictions. Default is \code{FALSE}.
-#' @param borders Numeric vector of category borders for continuous variables.
-#'  If NULL, no background category mapping is shown. Default is NULL.
+#' @param borders Either a numeric vector of category borders or the string "auto" or "none".
+#' If numeric vector, specifies the borders for category background mapping. If "auto" (default), uses
+#' the model's category borders. If "none", no background mapping is shown.
+#' Default is "auto".
 #' @param category_colors Character vector of colors for category backgrounds.
 #'  If NULL, uses default color palette.
 #' @param category_alpha Numeric value between 0 and 1 for category background transparency.
@@ -118,7 +120,7 @@ plot_pdp <- function(data,
                      limits = NULL,
                      colorVar = NULL,
                      probability = FALSE,
-                     borders = NULL,
+                     borders = "none",
                      category_colors = NULL,
                      category_alpha = 0.5,
                      category_names = NULL,
@@ -296,8 +298,25 @@ plot_pdp <- function(data,
   ice_data_sample <- pdp_data_list$ice_data_sample
   pdp_data <- pdp_data_list$pdp_data
   
+  # Validate and set the 'borders' variable
+  if (is.character(borders)) {
+    if (borders == "auto") {
+      borders <- model$category.borders
+    } else if (borders == "none") {
+      # If borders is 'none', we handle this by setting it to NULL or a similar flag
+      # so that the plotting code knows not to add background rectangles.
+      borders <- NULL 
+    } else {
+      stop("If 'borders' is a character, it must be 'auto' or 'none'.")
+    }
+  } else if (!is.numeric(borders) || length(borders) < 2) {
+    # If it's not a character, it must be a numeric vector of length 2 or more.
+    stop("'borders' must be 'auto', 'none', or a numeric vector with at least two values.")
+  }
+  
+  
   # Create color palette if not provided
-  if (is.null(category_colors) && !is.null(borders)) {
+  if (is.null(category_colors) && is.numeric(borders)) {
     # colors <- c('#4DAF4A', '#377EB8', '#FFFF33', '#FF7F00', '#E41A1C')
     # color_palette <- colorRampPalette(colors)
     # category_colors <- color_palette(length(borders) - 1)
@@ -327,14 +346,12 @@ plot_pdp <- function(data,
   
   #browser()
   
-  if (is.null(category_names)) {
+  if (is.null(category_names) && is.numeric(borders)) {
     category_names <- paste0("cat", seq_len(length(borders) - 1))
   }
   
   # Create background rectangles for cont x_var if borders are provided
-  if (!is.null(borders) && !is_categorical) {
-    
-  
+  if (!is_categorical && is.numeric(borders)) {
     
     # Function to create background rectangles
     create_background_rects <- function(borders, x_range) {
@@ -378,7 +395,7 @@ plot_pdp <- function(data,
       ) +
       guides(fill = guide_legend(reverse = TRUE))
     
-    if (show_vertical_lines) {
+    if (show_vertical_lines && is.numeric(borders)) {
             # Add horizontal lines for borders (excluding -Inf and Inf)
       p <- p +
         geom_hline(
@@ -458,12 +475,6 @@ plot_pdp <- function(data,
         point_color = pdp_meancolor,
         point_fill = pdp_meanfill         
       ) +
-      scale_fill_manual(
-        values = scales::alpha(category_colors[1:(length(borders) - 1)],
-                               alpha = category_alpha),
-        name = category_title,
-        labels = category_names[1:(length(borders) - 1)]
-      ) +
       # Add scale_y_continuous to restore original factor labels
       scale_y_continuous(
         breaks = seq_along(factor_levels),
@@ -493,7 +504,17 @@ plot_pdp <- function(data,
         panel.grid.major = element_line(color = "gray90", size = 0.5)
       )
     
-    if (show_vertical_lines) {
+    if (is.numeric(borders)) {
+      p <- p +
+        scale_fill_manual(
+          values = scales::alpha(category_colors[1:(length(borders) - 1)],
+                                 alpha = category_alpha),
+          name = category_title,
+          labels = category_names[1:(length(borders) - 1)]
+        )
+    }
+    
+    if (show_vertical_lines && is.numeric(borders)) {
       p <- p +
         geom_vline(
           xintercept = borders[!is.infinite(borders)],
