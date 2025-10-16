@@ -501,7 +501,7 @@ plot_pdp <- function(data,
       theme(
         legend.position = "right",
         panel.grid.minor = element_blank(),
-        panel.grid.major = element_line(color = "gray90", size = 0.5)
+        panel.grid.major = element_line(color = "gray90", linewidth = 0.5)
       )
     
     if (is.numeric(borders)) {
@@ -570,8 +570,8 @@ plot_pdp <- function(data,
       theme(
         legend.position = "right",
         panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_line(color = "white", size = 0.5),
-        panel.grid.major.y = element_line(color = "white", size = 0.5)
+        panel.grid.major.x = element_line(color = "white", linewidth = 0.5),
+        panel.grid.major.y = element_line(color = "white", linewidth = 0.5)
       )
   }
   

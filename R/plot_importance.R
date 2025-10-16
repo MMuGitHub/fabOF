@@ -141,7 +141,7 @@ plot_importance <- function(model,
     theme(
       panel.grid.minor = element_blank(),
       panel.grid.major.y = element_blank(),
-      panel.grid.major.x = element_line(color = "gray90", size = 0.5),
+      panel.grid.major.x = element_line(color = "gray90", linewidth = 0.5),
       plot.title = element_text(size = 14, face = "bold"),
       plot.subtitle = element_text(size = 12),
       axis.title = element_text(size = 11),
