@@ -38,7 +38,8 @@ plot_pdp(
   obs_shape = 4,
   ridgeline_scale = 0.8,
   ridgeline_color = "lightgrey",
-  show_vertical_lines = TRUE
+  show_vertical_lines = TRUE,
+  seed = 42
 )
 }
 \arguments{

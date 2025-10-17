@@ -141,7 +141,8 @@ plot_pdp <- function(data,
                      obs_shape = 4,
                      ridgeline_scale = 0.8,
                      ridgeline_color = "lightgrey",
-                     show_vertical_lines = TRUE
+                     show_vertical_lines = TRUE,
+                     seed = 42
                      ) {
   
   # Load required libraries
@@ -152,6 +153,10 @@ plot_pdp <- function(data,
   require(tibble)
   require(labeling)
   require(lme4)
+
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   
   # Input validation
   
@@ -425,6 +430,15 @@ plot_pdp <- function(data,
     ice_data_numeric <- ice_data %>%
       mutate(!!sym(x_var) := as.numeric(!!sym(x_var)))
     
+    # Prepare observed data points - only the actual observed values
+    observed_points <- ice_data_sample_numeric %>%
+      filter(!is.na(observed_fit)) %>%
+      mutate(x_value_numeric = as.numeric(!!sym(x_var)),
+             observed_x_numeric = as.numeric(observed_x)) %>%
+      # Only keep points where the x_var matches the observed_x
+      filter(x_value_numeric == observed_x_numeric) %>%
+      select(x_value = x_value_numeric, observed_fit, .id)
+    
     # CATEGORICAL PLOT with ridgelines (now using numeric values)
     # Prepare data for ridgelines - group ICE curves by x_var value
     ridgeline_data <- ice_data_sample_numeric %>%
@@ -442,11 +456,20 @@ plot_pdp <- function(data,
         scale = ridgeline_scale,
         rel_min_height = 0,
         color = ridgeline_color,
-        jittered_points = TRUE,
+        jittered_points = FALSE,
         point_color = obs_color,
         point_shape = obs_shape,
         point_size = ice_pointsize,
         point_alpha = ice_alpha
+      ) +
+      # Add observed prediction points
+      geom_point(
+        data = observed_points,
+        aes(x = observed_fit, y = x_value),
+        color = obs_color,
+        shape = obs_shape,
+        size = ice_pointsize,
+        alpha = 1  # Full opacity for observed points
       ) +
       # Add line connecting the mean values
       geom_line(
