@@ -29,13 +29,15 @@ predict.mixfabOF <-
       #newdata[[grp.var]] <- rep(NA, nrow(newdata))
       pred <- ranger.pred
     } else {
-      id <- newdata[, grp.var]
+      
+      #PROPOSED FIX to OG fabOF: Use [[ to ensure we get a vector (works with both data.frame and tibble)
+      id <- newdata[[grp.var]]
       ran.var <- strsplit(random.split[1], "\\+")[[1]]
-
+      
       if ("1" %in% ran.var) {
-        Z <- as.matrix(cbind(1, newdata[, ran.var[ran.var != "1"]]))
+        Z <- as.matrix(cbind(1, newdata[, ran.var[ran.var != "1"], drop = FALSE]))
       } else {
-        Z <- as.matrix(newdata[, ran.var])
+        Z <- as.matrix(newdata[, ran.var, drop = FALSE])
       }
       grps <- unique(id)
       n.grps <- length(grps)

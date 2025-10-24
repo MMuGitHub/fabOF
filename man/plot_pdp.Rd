@@ -22,8 +22,8 @@ plot_pdp(
   category_alpha = 0.5,
   category_names = NULL,
   category_title = NULL,
-  title = "Partial Dependence Plot",
-  subtitle = "Background colors show category mapping",
+  title = "Partial Dependence Plot with ICE Curves",
+  subtitle = NULL,
   ice_alpha = 0.4,
   ice_linecolor = "lightgrey",
   ice_linewidth = 0.5,
@@ -36,10 +36,17 @@ plot_pdp(
   pdp_meanshape = 23,
   obs_color = "black",
   obs_shape = 4,
+  show_observed = TRUE,
   ridgeline_scale = 0.8,
   ridgeline_color = "lightgrey",
   show_vertical_lines = TRUE,
-  seed = 42
+  seed = 42,
+  cond_color_var = NULL,
+  cond_color_levels = NULL,
+  cond_color_palette = NULL,
+  cond_color_title = NULL,
+  cond_color_foreground = NULL,
+  show_category_background = NULL
 )
 }
 \arguments{
@@ -85,11 +92,9 @@ If NULL, uses default names.}
 \item{category_title}{Character vector of the legend title.
 If NULL, no title is shown.}
 
-\item{title}{Character string for the plot title. Default is "Partial Dependence
-Plot with Individual Conditional Expectation Lines".}
+\item{title}{Character string for the plot title. Default is "Partial Dependence Plot with ICE Curves".}
 
-\item{subtitle}{Character string for the plot subtitle. Default is "Background
-colors show category mapping".}
+\item{subtitle}{Character string for the plot subtitle. Default is NULL (no subtitle).}
 
 \item{ice_alpha}{Numeric value between 0 and 1 for ICE line transparency.
 Default is 0.4.}
@@ -118,10 +123,44 @@ Default is "black".}
 
 \item{obs_color}{Character string for the color of observed prediction points. Default is "grey".}
 
+\item{show_observed}{Logical. If \code{TRUE}, shows observed prediction points on the plot.
+Default is \code{TRUE}. Note: Not applicable for categorical X with conditional coloring.}
+
 \item{ridgeline_scale}{Numeric value controlling the height scaling of ridgeline
 plots for categorical variables. Default is 0.8.}
 
-\item{show_vertical_lines}{Logical. If \code{TRUE}, adds vertical dashed lines at the category borders. Default is \code{TRUE}.}
+\item{show_vertical_lines}{Logical. If \code{TRUE}, adds vertical dashed lines at category borders.
+Works for all plot types (continuous/categorical X, conditional/unconditional). Default is \code{TRUE}.}
+
+\item{cond_color_var}{Character string specifying the name of a second predictor variable
+to use for conditional coloring of ICE curves. When specified, ICE curves are colored by this
+variable to explore potential interactions. Default is \code{NULL} (no conditional coloring).}
+
+\item{cond_color_levels}{Character vector or named list specifying which levels/ranges to color.
+For categorical variables: character vector of factor levels (if NULL, uses first 3-5 levels).
+For continuous variables: named list where names are labels and values are numeric vectors of length 2
+specifying ranges, e.g., \code{list("Low" = c(0, 5), "High" = c(5, 10))}.}
+
+\item{cond_color_palette}{Character vector of colors to use for conditional coloring.
+If NULL, uses a default color palette. Length should match number of conditioning levels/ranges.}
+
+\item{cond_color_title}{Character string for the conditional color legend title.
+If NULL, uses the variable name from \code{cond_color_var}.}
+
+\item{cond_color_foreground}{Character vector specifying the plotting order of conditioning variable
+levels from back to front (first element plotted first/in background, last element plotted last/in foreground).
+For categorical variables: provide a vector of level names in desired order.
+For continuous variables: provide a vector of range names in desired order.
+If only one value is provided, that level is plotted on top with others in default order underneath.
+If NULL, default plotting order is used. Only applicable for continuous X with conditional coloring.}
+
+\item{show_category_background}{Logical. Controls colored backgrounds/fills for category mapping:
+\itemize{
+  \item For continuous X: Shows colored background rectangles.
+  \item For categorical X (unconditional): Controls density ridge fill coloring by category.
+  \item For categorical X (conditional): Not applicable - densities are colored by conditioning variable.
+}
+Default is \code{TRUE} when \code{cond_color_var = NULL}, \code{FALSE} otherwise.}
 
 \item{fit}{A fitted \code{ranger} model object.}
 }
@@ -150,6 +189,12 @@ The function automatically detects the variable type based on the original data:
   PDP mean line, and optional category background mapping using the \code{borders} parameter.
  \item \strong{Categorical variables}: Creates ridgeline plots showing the
   distribution of ICE predictions for each category level, with PDP mean points.
+ \item \strong{Conditional ICE plots}: When \code{cond_color_var} is specified, ICE curves
+  are colored by a second predictor variable to explore potential interactions (as recommended
+  by Strobl et al. 2024). For continuous x-variables, ICE lines are colored by the conditioning
+  variable. For categorical x-variables, separate density ridges are created for each combination
+  of the x-variable and conditioning variable levels. By default, category background coloring
+  is disabled when conditional coloring is active, showing only vertical lines at category borders.
 }
 }
 \examples{
@@ -157,22 +202,92 @@ The function automatically detects the variable type based on the original data:
 # Basic usage - just get the plot
 plot <- plot_pdp(
  data = dm_train_dummy,
- fit = rf_ord_dummy$ranger.fit,
+ model = rf_ord_dummy,
  response = "score",
- var = "item01"
+ x_var = "item01",
+ x_var_title = "Item 01"
 )
 
 # Verbose usage - get plot, data, and variable type info
 result <- plot_pdp(
  data = dm_train_dummy,
- fit = rf_ord_dummy$ranger.fit,
+ model = rf_ord_dummy,
  response = "score",
- var = "item01",
+ x_var = "item01",
+ x_var_title = "Item 01",
  verbose = TRUE
 )
 
 print(result$plot)
 head(result$data$ice_data)
+
+# Conditional ICE plot with categorical conditioning variable
+# Color ICE curves by gender to explore potential interactions
+plot <- plot_pdp(
+ data = dm_train_dummy,
+ model = rf_ord_dummy,
+ response = "score",
+ x_var = "age",
+ x_var_title = "Age",
+ cond_color_var = "gender",
+ cond_color_levels = c("Male", "Female"),  # Select specific levels
+ cond_color_palette = c("#E69F00", "#56B4E9"),  # Custom colors
+ cond_color_title = "Gender"
+)
+
+# Conditional ICE plot with continuous conditioning variable
+# Color ICE curves by income ranges
+plot <- plot_pdp(
+ data = dm_train_dummy,
+ model = rf_ord_dummy,
+ response = "score",
+ x_var = "education",
+ x_var_title = "Education Level",
+ cond_color_var = "income",
+ cond_color_levels = list(
+   "Low" = c(0, 30000),
+   "Medium" = c(30000, 70000),
+   "High" = c(70000, 150000)
+ ),
+ cond_color_palette = c("#d73027", "#fee090", "#4575b4"),
+ cond_color_title = "Income Range"
+)
+
+# Conditional ICE plot with category background visible
+plot <- plot_pdp(
+ data = dm_train_dummy,
+ model = rf_ord_dummy,
+ response = "score",
+ x_var = "age",
+ x_var_title = "Age",
+ cond_color_var = "gender",
+ show_category_background = TRUE,  # Show colored background for categories
+ borders = "auto"  # Use model's category borders
+)
+
+# Conditional ICE plot with specific level in foreground
+plot <- plot_pdp(
+ data = dm_train_dummy,
+ model = rf_ord_dummy,
+ response = "score",
+ x_var = "age",
+ x_var_title = "Age",
+ cond_color_var = "gender",
+ cond_color_levels = c("Male", "Female"),
+ cond_color_foreground = "Female"  # Plot Female curves on top
+)
+
+# Conditional ICE plot with explicit plotting order
+plot <- plot_pdp(
+ data = dm_train_dummy,
+ model = rf_ord_dummy,
+ response = "score",
+ x_var = "age",
+ x_var_title = "Age",
+ cond_color_var = "region",
+ cond_color_levels = c("North", "South", "East", "West"),
+ cond_color_foreground = c("North", "South", "East", "West")  # Explicit order: North in back, West on top
+)
 }
 
 }

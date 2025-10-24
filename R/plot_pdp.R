@@ -34,10 +34,8 @@
 #'  If NULL, uses default names.
 #' @param category_title Character vector of the legend title.
 #'  If NULL, no title is shown.
-#' @param title Character string for the plot title. Default is "Partial Dependence
-#'  Plot with Individual Conditional Expectation Lines".
-#' @param subtitle Character string for the plot subtitle. Default is "Background
-#'  colors show category mapping".
+#' @param title Character string for the plot title. Default is "Partial Dependence Plot with ICE Curves".
+#' @param subtitle Character string for the plot subtitle. Default is NULL (no subtitle).
 #' @param ice_alpha Numeric value between 0 and 1 for ICE line transparency.
 #'  Default is 0.4.
 #' @param ice_linecolor Character string specifying the color of ICE lines. Default is "purple".
@@ -54,9 +52,19 @@
 #'  Default is "black".
 #' @param pdp_meanshape Numeric value for the shape of the point for the PDP mean. Default is 16.
 #' @param obs_color Character string for the color of observed prediction points. Default is "grey".
+#' @param show_observed Logical. If \code{TRUE}, shows observed prediction points on the plot.
+#'  Default is \code{TRUE}. Note: Not applicable for categorical X with conditional coloring.
 #' @param ridgeline_scale Numeric value controlling the height scaling of ridgeline
 #'  plots for categorical variables. Default is 0.8.
-#' @param show_vertical_lines Logical. If \code{TRUE}, adds vertical dashed lines at the category borders. Default is \code{TRUE}.
+#' @param show_category_background Logical. Controls colored backgrounds/fills for category mapping:
+#'  \itemize{
+#'    \item For continuous X: Shows colored background rectangles.
+#'    \item For categorical X (unconditional): Controls density ridge fill coloring by category.
+#'    \item For categorical X (conditional): Not applicable - densities are colored by conditioning variable.
+#'  }
+#'  Default is \code{TRUE} when \code{cond_color_var = NULL}, \code{FALSE} otherwise.
+#' @param show_vertical_lines Logical. If \code{TRUE}, adds vertical dashed lines at category borders.
+#'  Works for all plot types (continuous/categorical X, conditional/unconditional). Default is \code{TRUE}.
 #' @param cond_color_var Character string specifying the name of a second predictor variable
 #'  to use for conditional coloring of ICE curves. When specified, ICE curves are colored by this
 #'  variable to explore potential interactions. Default is \code{NULL} (no conditional coloring).
@@ -68,9 +76,12 @@
 #'  If NULL, uses a default color palette. Length should match number of conditioning levels/ranges.
 #' @param cond_color_title Character string for the conditional color legend title.
 #'  If NULL, uses the variable name from \code{cond_color_var}.
-#' @param show_category_background Logical. If \code{TRUE}, shows colored background for category borders
-#'  even when conditional coloring is active. Default is \code{FALSE} when \code{cond_color_var} is specified,
-#'  \code{TRUE} otherwise.
+#' @param cond_color_foreground Character vector specifying the plotting order of conditioning variable
+#'  levels from back to front (first element plotted first/in background, last element plotted last/in foreground).
+#'  For categorical variables: provide a vector of level names in desired order.
+#'  For continuous variables: provide a vector of range names in desired order.
+#'  If only one value is provided, that level is plotted on top with others in default order underneath.
+#'  If NULL, default plotting order is used. Only applicable for continuous X with conditional coloring.
 #'
 #' @return If \code{verbose = FALSE}, returns a ggplot object. If \code{verbose = TRUE},
 #'  returns a list with elements:
@@ -163,6 +174,30 @@
 #'  show_category_background = TRUE,  # Show colored background for categories
 #'  borders = "auto"  # Use model's category borders
 #' )
+#'
+#' # Conditional ICE plot with specific level in foreground
+#' plot <- plot_pdp(
+#'  data = dm_train_dummy,
+#'  model = rf_ord_dummy,
+#'  response = "score",
+#'  x_var = "age",
+#'  x_var_title = "Age",
+#'  cond_color_var = "gender",
+#'  cond_color_levels = c("Male", "Female"),
+#'  cond_color_foreground = "Female"  # Plot Female curves on top
+#' )
+#'
+#' # Conditional ICE plot with explicit plotting order
+#' plot <- plot_pdp(
+#'  data = dm_train_dummy,
+#'  model = rf_ord_dummy,
+#'  response = "score",
+#'  x_var = "age",
+#'  x_var_title = "Age",
+#'  cond_color_var = "region",
+#'  cond_color_levels = c("North", "South", "East", "West"),
+#'  cond_color_foreground = c("North", "South", "East", "West")  # Explicit order: North in back, West on top
+#' )
 #' }
 #'
 #' @import ggplot2
@@ -192,8 +227,8 @@ plot_pdp <- function(
   category_alpha = 0.5,
   category_names = NULL,
   category_title = NULL,
-  title = "Partial Dependence Plot",
-  subtitle = "Background colors show category mapping",
+  title = "Partial Dependence Plot with ICE Curves",
+  subtitle = NULL,
   ice_alpha = 0.4,
   ice_linecolor = "lightgrey",
   ice_linewidth = 0.5,
@@ -206,6 +241,7 @@ plot_pdp <- function(
   pdp_meanshape = 23,
   obs_color = "black",
   obs_shape = 4,
+  show_observed = TRUE,
   ridgeline_scale = 0.8,
   ridgeline_color = "lightgrey",
   show_vertical_lines = TRUE,
@@ -214,6 +250,7 @@ plot_pdp <- function(
   cond_color_levels = NULL,
   cond_color_palette = NULL,
   cond_color_title = NULL,
+  cond_color_foreground = NULL,
   show_category_background = NULL
 ) {
   # Load required libraries
@@ -252,25 +289,6 @@ plot_pdp <- function(
   random_terms <- lme4::findbars(model$random.formula)
   randeff_name <- as.character(random_terms[[1]][[3]])
   vars_with_randeff <- c(vars, randeff_name)
-
-  for (var_name in vars) {
-    #unique_values <- length(unique(data[[var_name]]))
-    is_factor_or_char <- is.factor(data[[var_name]]) #|| is.character(data[[var_name]])
-    #is_few_values <- unique_values <= 4
-
-    is_categorical <- is_factor_or_char #|| is_few_values
-
-    # Warning if treating numeric variable as categorical due to few values
-    # if (!is_factor_or_char && is_few_values) {
-    #   warning(paste0("Variable '", var_name, "' has only ", unique_values,
-    #                  " unique values. Converting to factor."))
-    # }
-    #
-    # # Transform to factor if categorical
-    # if (is_categorical) {
-    #   data[[var_name]] <- as.factor(data[[var_name]])
-    # }
-  }
 
   # Now check the specific plotting variable type AFTER transformation
 
@@ -336,8 +354,8 @@ plot_pdp <- function(
       } else if (length(cond_color_palette) != length(cond_color_levels)) {
         warning(paste0("cond_color_palette has ", length(cond_color_palette),
                       " colors but ", length(cond_color_levels), " levels specified. ",
-                      "Adjusting palette."))
-        cond_color_palette <- rep_len(cond_color_palette, length(cond_color_levels))
+                      "Using default color palette instead."))
+        cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
       }
 
     } else {
@@ -367,8 +385,8 @@ plot_pdp <- function(
       } else if (length(cond_color_palette) != length(cond_color_levels)) {
         warning(paste0("cond_color_palette has ", length(cond_color_palette),
                       " colors but ", length(cond_color_levels), " ranges specified. ",
-                      "Adjusting palette."))
-        cond_color_palette <- rep_len(cond_color_palette, length(cond_color_levels))
+                      "Using default color palette instead."))
+        cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
       }
     }
   }
@@ -404,7 +422,7 @@ plot_pdp <- function(
   for (i in seq_along(vars)) {
     #creates data for each variable in vars, for each observation, for
     #for each gridpoint.
-    #note: id refers to observation, pid refers to variable
+    #note: .id refers to observation, .pid refers to variable
     px <- vivid:::pdp_data(d = data_clean, var = vars[i], gridsize = gridsize)
     px$.pid <- i
     pdplist1[[i]] <- px
@@ -425,15 +443,15 @@ plot_pdp <- function(
     stop(paste0("Variable '", x_var, "' not found in processed variables"))
   }
 
-  pdp <- pdplist1[[var_index]]
+  ice_data <- pdplist1[[var_index]]
 
-  # Aggregate mean PDP
-  aggr <- pdp %>%
+  # Aggregate mean ice_data
+  aggr <- ice_data %>%
     dplyr::group_by(.data[[x_var]]) %>%
     dplyr::summarise(fit = mean(fit))
 
   # Filter ICE data for selected curves
-  ice_data_sample <- dplyr::filter(pdp, .data[[".id"]] %in% sice)
+  ice_data_sample <- dplyr::filter(ice_data, .data[[".id"]] %in% sice)
 
   # Here run a seperate prediction with the actually observed data to get the
   # observed prediction values for the sampled ICE curves:
@@ -463,20 +481,6 @@ plot_pdp <- function(
   # ============================================================================
 
   if (use_conditional_coloring) {
-    # Add conditioning variable values to ice_data and ice_data_sample
-    # by joining with the original data via .id
-
-    # Create a lookup table for conditioning variable values
-    cond_lookup <- data_clean %>%
-      mutate(.id = row_number()) %>%
-      select(.id, !!sym(cond_color_var))
-
-    # Join conditioning variable to ice_data and ice_data_sample
-    ice_data <- ice_data %>%
-      left_join(cond_lookup, by = ".id")
-
-    ice_data_sample <- ice_data_sample %>%
-      left_join(cond_lookup, by = ".id")
 
     # Create color grouping variable
     if (cond_var_is_categorical) {
@@ -523,8 +527,14 @@ plot_pdp <- function(
     }
 
     # Create named color vector for use in plotting
-    cond_color_scale <- setNames(cond_color_palette,
-                                  if(cond_var_is_categorical) cond_color_levels else names(cond_color_levels))
+    cond_color_scale <- setNames(
+      cond_color_palette,
+      if (cond_var_is_categorical) {
+        cond_color_levels
+      } else {
+        names(cond_color_levels)
+      }
+    )
   }
 
   # Create data list
@@ -563,7 +573,7 @@ plot_pdp <- function(
 
   # Create color palette if not provided
   if (is.null(category_colors) && is.numeric(borders)) {
-    # colors <- c('#4DAF4A', '#377EB8', '#FFFF33', '#FF7F00', '#E41A1C')
+    # colors <- c('#4DAF4A', '#2d5d85ff', '#FFFF33', '#FF7F00', '#E41A1C')
     # color_palette <- colorRampPalette(colors)
     # category_colors <- color_palette(length(borders) - 1)
     category_colors <- paletteer::paletteer_d(
@@ -579,7 +589,7 @@ plot_pdp <- function(
       max(c(ice_data_sample$fit, pdp_data$fit))
     ))
   }
-
+  
   # Get x-axis range for background rectangles
   if (is_categorical) {
     # For categorical variables, create range based on factor levels
@@ -592,14 +602,12 @@ plot_pdp <- function(
     x_range <- range(ice_data_sample[[x_var]], na.rm = TRUE)
   }
 
-  #browser()
-
   if (is.null(category_names) && is.numeric(borders)) {
     category_names <- paste0("cat", seq_len(length(borders) - 1))
   }
 
-  # Create background rectangles for cont x_var if borders are provided
-  # Only show background if show_category_background is TRUE
+  # CONTINUOUS X: Create background rectangles if borders are provided
+  # show_category_background controls whether colored background rectangles are shown
   if (!is_categorical && is.numeric(borders) && show_category_background) {
     # Function to create background rectangles
     create_background_rects <- function(borders, x_range) {
@@ -670,8 +678,6 @@ plot_pdp <- function(
     p <- ggplot()
   }
 
-  #browser()
-
   if (is_categorical) {
     # Convert factor to numeric while preserving original factor levels for labeling
     factor_levels <- levels(ice_data_sample[[x_var]])
@@ -721,6 +727,19 @@ plot_pdp <- function(
       y_breaks <- seq_along(factor_levels)
       y_labels <- factor_labels
 
+      # Compute mean values for each combination of x_var and conditioning variable
+      mean_data <- ice_data_numeric %>%
+        filter(!is.na(cond_color_group)) %>%
+        select(all_of(x_var), fit, .id, cond_color_group) %>%
+        rename(x_value = !!sym(x_var)) %>%
+        group_by(x_value, cond_color_group) %>%
+        summarise(mean_fit = mean(fit), .groups = "drop") %>%
+        mutate(
+          # Adjust y position to match ridgeline positions
+          y_position = x_value + (as.numeric(cond_color_group) - 1) * 0.15 -
+                       (n_cond_levels - 1) * 0.15 / 2
+        )
+
       p <- ggplot(data = ridgeline_data) +
         stat_density_ridges(
           mapping = aes(
@@ -734,6 +753,29 @@ plot_pdp <- function(
           rel_min_height = 0,
           color = ridgeline_color,
           alpha = 0.7
+        ) +
+        # Add line connecting the mean values for each combination of x_var and conditioning variable
+        geom_line(
+          data = mean_data,
+          mapping = aes(
+            y = y_position,
+            x = mean_fit,
+            group = cond_color_group
+          ),
+          color = pdp_meancolor,
+          size = pdp_linewidth
+        ) +
+        # Add mean points
+        geom_point(
+          data = mean_data,
+          mapping = aes(
+            y = y_position,
+            x = mean_fit
+          ),
+          color = pdp_meancolor,
+          fill = pdp_meanfill,
+          shape = pdp_meanshape,
+          size = ice_pointsize
         ) +
         # Add conditional color scale
         scale_fill_manual(
@@ -761,18 +803,10 @@ plot_pdp <- function(
           panel.grid.major = element_line(color = "gray90", linewidth = 0.5)
         )
 
-      # Optionally add category borders as background or vertical lines
-      if (is.numeric(borders) && show_category_background) {
-        # Note: background coloring with conditional coloring is complex
-        # For now, we'll just add vertical lines
-        p <- p +
-          geom_vline(
-            xintercept = borders[!is.infinite(borders)],
-            color = "black",
-            linetype = "dashed",
-            alpha = 0.8
-          )
-      } else if (show_vertical_lines && is.numeric(borders)) {
+      # Add vertical lines at category borders if requested
+      # Note: show_category_background is not applicable for conditional coloring
+      # (densities are already colored by the conditioning variable)
+      if (show_vertical_lines && is.numeric(borders)) {
         p <- p +
           geom_vline(
             xintercept = borders[!is.infinite(borders)],
@@ -783,7 +817,7 @@ plot_pdp <- function(
       }
 
     } else {
-      # Original non-conditional plot
+      # Unconditional categorical X plot
       # Prepare data for ridgelines - group ICE curves by x_var value
       ridgeline_data <- ice_data_sample_numeric %>%
         select(all_of(x_var), fit, .id) %>%
@@ -795,9 +829,17 @@ plot_pdp <- function(
             y = .data$x_value,
             group = .data$x_value,
             x = fit,
-            fill = after_stat(cut(x, breaks = borders))
+            fill = if (show_category_background && is.numeric(borders)) {
+              after_stat(cut(x, breaks = borders))
+            } else {
+              NULL
+            }
           ),
-          geom = "density_ridges_gradient",
+          geom = if (show_category_background && is.numeric(borders)) {
+            "density_ridges_gradient"
+          } else {
+            "density_ridges"
+          },
           scale = ridgeline_scale,
           rel_min_height = 0,
           color = ridgeline_color,
@@ -806,16 +848,22 @@ plot_pdp <- function(
           point_shape = obs_shape,
           point_size = ice_pointsize,
           point_alpha = ice_alpha
-        ) +
-        # Add observed prediction points
-        geom_point(
-          data = observed_points,
-          aes(x = observed_fit, y = x_value),
-          color = obs_color,
-          shape = obs_shape,
-          size = ice_pointsize,
-          alpha = 1 # Full opacity for observed points
-        ) +
+        )
+
+      # Add observed prediction points if requested
+      if (show_observed) {
+        p <- p +
+          geom_point(
+            data = observed_points,
+            aes(x = observed_fit, y = x_value),
+            color = obs_color,
+            shape = obs_shape,
+            size = ice_pointsize,
+            alpha = 1
+          )
+      }
+
+      p <- p +
         # Add line connecting the mean values
         geom_line(
           data = ice_data_numeric %>%
@@ -824,9 +872,9 @@ plot_pdp <- function(
             group_by(x_value) %>%
             summarise(mean_fit = mean(fit), .groups = "drop"),
           mapping = aes(y = x_value, x = mean_fit),
-          color = pdp_meancolor, # Use same color as the mean points
+          color = pdp_meancolor,
           size = pdp_linewidth,
-          position = position_nudge(y = -0.05) # Same nudge as the points
+          position = position_nudge(y = -0.05)
         ) +
         ggdist::stat_pointinterval(
           data = ice_data_numeric %>%
@@ -847,17 +895,6 @@ plot_pdp <- function(
           labels = factor_labels,
           name = x_var_title
         ) +
-        guides(
-          fill = guide_legend(
-            reverse = TRUE,
-            # Override the point aesthetics in the legend
-            override.aes = list(
-              point_color = NA,
-              point_size = NA,
-              point_alpha = NA
-            )
-          )
-        ) +
         # Labels and theme
         labs(
           x = "Latent Score",
@@ -872,7 +909,8 @@ plot_pdp <- function(
           panel.grid.major = element_line(color = "gray90", linewidth = 0.5)
         )
 
-      if (is.numeric(borders)) {
+      # Add category fill colors if show_category_background is TRUE
+      if (show_category_background && is.numeric(borders)) {
         p <- p +
           scale_fill_manual(
             values = scales::alpha(
@@ -881,9 +919,21 @@ plot_pdp <- function(
             ),
             name = category_title,
             labels = category_names[1:(length(borders) - 1)]
+          ) +
+          guides(
+            fill = guide_legend(
+              reverse = TRUE,
+              # Override the point aesthetics in the legend
+              override.aes = list(
+                point_color = NA,
+                point_size = NA,
+                point_alpha = NA
+              )
+            )
           )
       }
 
+      # Add vertical lines at category borders if requested
       if (show_vertical_lines && is.numeric(borders)) {
         p <- p +
           geom_vline(
@@ -900,20 +950,73 @@ plot_pdp <- function(
     # Add continuous-specific elements to the plot
 
     if (use_conditional_coloring) {
-      # Add ICE lines with conditional coloring
-      p <- p +
-        geom_line(
-          data = ice_data_sample,
-          aes(x = !!sym(x_var), y = fit, group = .id, color = cond_color_group),
-          alpha = ice_alpha,
-          linewidth = ice_linewidth
-        ) +
+      # Handle custom plotting order
+      if (!is.null(cond_color_foreground)) {
+        # Get available levels
+        available_levels <- unique(as.character(ice_data_sample$cond_color_group))
+        available_levels <- available_levels[!is.na(available_levels)]
+
+        # Validate provided order
+        fg_order <- as.character(cond_color_foreground)
+        invalid_levels <- setdiff(fg_order, available_levels)
+
+        if (length(invalid_levels) > 0) {
+          warning(paste0("cond_color_foreground contains invalid levels: ",
+                        paste(invalid_levels, collapse = ", "),
+                        ". Available levels: ",
+                        paste(available_levels, collapse = ", ")))
+          # Remove invalid levels
+          fg_order <- intersect(fg_order, available_levels)
+        }
+
+        # Add any missing levels to the beginning (background)
+        missing_levels <- setdiff(available_levels, fg_order)
+        if (length(missing_levels) > 0) {
+          fg_order <- c(missing_levels, fg_order)
+          message(paste0("Levels not in cond_color_foreground will be plotted in background: ",
+                        paste(missing_levels, collapse = ", ")))
+        }
+
+        message(paste0("Plotting order (back to front): ", paste(fg_order, collapse = " < ")))
+
+        # Plot each level as a separate layer in the specified order
+        for (level in fg_order) {
+          level_data <- ice_data_sample %>%
+            filter(as.character(cond_color_group) == level)
+
+          p <- p +
+            geom_line(
+              data = level_data,
+              aes(x = !!sym(x_var), y = fit, group = .id, color = cond_color_group),
+              #alpha = ice_alpha,
+              linewidth = ice_linewidth
+            )
+        }
+
         # Add conditional color scale
-        scale_color_manual(
-          values = cond_color_scale,
-          name = cond_color_title,
-          na.translate = FALSE
-        )
+        p <- p +
+          scale_color_manual(
+            values = cond_color_scale,
+            name = cond_color_title,
+            na.translate = FALSE
+          )
+
+      } else {
+        # No custom order specified, plot normally
+        p <- p +
+          geom_line(
+            data = ice_data_sample,
+            aes(x = !!sym(x_var), y = fit, group = .id, color = cond_color_group),
+            alpha = ice_alpha,
+            linewidth = ice_linewidth
+          ) +
+          # Add conditional color scale
+          scale_color_manual(
+            values = cond_color_scale,
+            name = cond_color_title,
+            na.translate = FALSE
+          )
+      }
     } else {
       # Add ICE lines without conditional coloring
       p <- p +
@@ -933,18 +1036,23 @@ plot_pdp <- function(
         aes(x = !!sym(x_var), y = fit),
         color = pdp_linecolor,
         linewidth = pdp_linewidth
-      ) +
+      )
 
-      # Add observed predictions as points
-      geom_point(
-        data = ice_data_sample %>%
-          filter(!is.na(observed_fit)), # Only plot where observed data exists
-        aes(x = observed_x, y = observed_fit),
-        color = obs_color,
-        shape = obs_shape,
-        size = ice_pointsize,
-        alpha = 1 # Full opacity for observed points to make them stand out
-      ) +
+    # Add observed predictions as points if requested
+    if (show_observed) {
+      p <- p +
+        geom_point(
+          data = ice_data_sample %>%
+            filter(!is.na(observed_fit)),
+          aes(x = observed_x, y = observed_fit),
+          color = obs_color,
+          shape = obs_shape,
+          size = ice_pointsize,
+          alpha = 1
+        )
+    }
+
+    p <- p +
 
       # Set axis limits
       coord_cartesian(ylim = limits) +
