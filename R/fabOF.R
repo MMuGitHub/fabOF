@@ -72,44 +72,57 @@
 #'
 #' @import ranger
 #' @export
-fabOF <- function(formula, data, scores = NULL, importance = FALSE, importance.reps = 100,
-                  ranger.control = NULL) {
-
-  if(!class(formula) %in% c("formula", "character")) {
-    stop("Error: Argument 'formula' must either be of class formula or character.")
+fabOF <- function(
+  formula,
+  data,
+  scores = NULL,
+  importance = FALSE,
+  importance.reps = 100,
+  ranger.control = NULL
+) {
+  if (!class(formula) %in% c("formula", "character")) {
+    stop(
+      "Error: Argument 'formula' must either be of class formula or character."
+    )
   }
 
-  if(is.character(formula)) {
+  if (is.character(formula)) {
     formula <- as.formula(formula)
   }
 
   target <- toString(formula[[2]])
 
-  if(!is.factor(data[, target])) {
-    stop("Error: Target variable must be a factor variable (where the level order represents the order of the ordinal categories).")
+  if (!is.factor(data[, target])) {
+    stop(
+      "Error: Target variable must be a factor variable (where the level order represents the order of the ordinal categories)."
+    )
   }
-  if(length(target) != 1) {
-    stop("Error: Invalid length of target in formula. Only one target variable supported.")
+  if (length(target) != 1) {
+    stop(
+      "Error: Invalid length of target in formula. Only one target variable supported."
+    )
   }
 
   class.idx <- as.numeric(data[, target])
   cats <- levels(data[, target])
   ncats <- length(cats)
 
-  if(ncats <= 1) {
+  if (ncats <= 1) {
     stop("Error: Number of categories must be greater than 1.")
   }
 
-  if(is.null(scores)) {
+  if (is.null(scores)) {
     scores <- 1:ncats
   } else {
-    if(!is.numeric(scores)) {
+    if (!is.numeric(scores)) {
       stop("Error: Provided scores must be numeric.")
     }
-    if(length(scores) != length(levels(data[, target]))) {
-      stop("Error: Must provide score for each ordinal response category level.")
+    if (length(scores) != length(levels(data[, target]))) {
+      stop(
+        "Error: Must provide score for each ordinal response category level."
+      )
     }
-    if(is.unsorted(scores)) {
+    if (is.unsorted(scores)) {
       stop("Error: Provided scores must be in ascending order.")
     }
   }
@@ -117,40 +130,55 @@ fabOF <- function(formula, data, scores = NULL, importance = FALSE, importance.r
   data.tmp <- data
   data.tmp[, target] <- scores[class.idx]
 
-  if(importance) {
-      ranger.control <- c(ranger.control, list(keep.inbag = TRUE))
+  if (importance) {
+    ranger.control <- c(ranger.control, list(keep.inbag = TRUE))
   }
 
   ranger.control <- makeRangerControl(ranger.control)
   variable.importance <- NULL
 
-  ranger.fit <- do.call(ranger::ranger, c(list(formula = formula, data = data.tmp), ranger.control), quote = TRUE)
+  ranger.fit <- do.call(
+    ranger::ranger,
+    c(list(formula = formula, data = data.tmp), ranger.control),
+    quote = TRUE
+  )
   ranger.fit$call <- NULL
 
   pred <- ranger.fit$predictions
   cat.freqs <- table(data[, target])
-  cat.cumsum <- cumsum(cat.freqs)/nrow(data)
-  oob.pred.quantiles <- as.numeric(quantile(pred, probs = as.numeric(cat.cumsum)[-ncats]))
+  cat.cumsum <- cumsum(cat.freqs) / nrow(data)
+  oob.pred.quantiles <- as.numeric(quantile(
+    pred,
+    probs = as.numeric(cat.cumsum)[-ncats]
+  ))
   cat.borders <- c(scores[1], oob.pred.quantiles, scores[ncats])
 
-  if(importance) {
-    pred.num <- sapply(pred, function(x) max(which(x >= cat.borders[1:length(cats)])))
+  if (importance) {
+    pred.num <- sapply(pred, function(x) {
+      max(which(x >= cat.borders[1:length(cats)]))
+    })
     pred.cat <- factor(cats[pred.num], levels = cats)
     orig.err <- linearKappa(data[, target], pred.cat)
     vars <- attr(terms(formula, data = data), "term.labels")
     perm.err <- matrix(0, nrow = length(vars), ncol = importance.reps)
     oob.mat <- do.call(cbind, ranger.fit$inbag.counts) < 1
 
-    for(i in 1:length(vars)) {
+    for (i in 1:length(vars)) {
       var.orig <- data.tmp[, vars[i]]
 
-      for(j in 1:importance.reps) {
+      for (j in 1:importance.reps) {
         var.perm <- sample(var.orig)
         data.tmp[, vars[i]] <- var.perm
 
-        pred.mat <- predict(ranger.fit, data.tmp, predict.all = TRUE)$predictions
+        pred.mat <- predict(
+          ranger.fit,
+          data.tmp,
+          predict.all = TRUE
+        )$predictions
         pred.oob <- rowSums(pred.mat * oob.mat) / rowSums(oob.mat)
-        pred.oob.num <- sapply(pred.oob, function(x) max(which(x >= cat.borders[1:length(cats)])))
+        pred.oob.num <- sapply(pred.oob, function(x) {
+          max(which(x >= cat.borders[1:length(cats)]))
+        })
         pred.oob.cat <- factor(cats[pred.oob.num], levels = cats)
 
         perm.err[i, j] <- linearKappa(data[, target], pred.oob.cat)
@@ -163,10 +191,16 @@ fabOF <- function(formula, data, scores = NULL, importance = FALSE, importance.r
     names(variable.importance) <- vars
   }
 
-  result <- list(ranger.fit = ranger.fit, category.borders = cat.borders, categories = cats,
-                 category.scores = scores, category.frequencies = cat.freqs,
-                 variable.importance = variable.importance,
-                 target = target, call = sys.call())
+  result <- list(
+    ranger.fit = ranger.fit,
+    category.borders = cat.borders,
+    categories = cats,
+    category.scores = scores,
+    category.frequencies = cat.freqs,
+    variable.importance = variable.importance,
+    target = target,
+    call = sys.call()
+  )
   class(result) <- "fabOF"
 
   return(result)

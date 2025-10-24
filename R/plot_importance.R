@@ -65,69 +65,76 @@
 #' @importFrom tibble tibble
 #'
 #' @export
-plot_importance <- function(model,
-                            top_n = NULL,
-                            title = "Variable Importance",
-                            subtitle = NULL,
-                            x_title = "Importance Score",
-                            y_title = "Variables",
-                            bar_color = "#008080",
-                            bar_alpha = 0.8,
-                            text_color = "white",
-                            text_size = 3,
-                            show_values = TRUE,
-                            sort_ascending = FALSE,
-                            threshold = NULL,
-                            threshold_color = "red",
-                            digits = 4) {
-  
+plot_importance <- function(
+  model,
+  top_n = NULL,
+  title = "Variable Importance",
+  subtitle = NULL,
+  x_title = "Importance Score",
+  y_title = "Variables",
+  bar_color = "#008080",
+  bar_alpha = 0.8,
+  text_color = "white",
+  text_size = 3,
+  show_values = TRUE,
+  sort_ascending = FALSE,
+  threshold = NULL,
+  threshold_color = "red",
+  digits = 4
+) {
   # Load required libraries
   require(ggplot2)
   require(dplyr)
   require(tibble)
-  
+
   # Input validation
   if (!inherits(model, c("mixfabOF", "fabOF"))) {
     stop("Model must be a 'mixfabOF' or 'fabOF' object.")
   }
-  
+
   # Extract variable importance from model object
   if (is.null(model$variable.importance)) {
-    stop("Variable importance not available. Make sure the model was fitted with importance = 'permutation' or 'impurity'.")
+    stop(
+      "Variable importance not available. Make sure the model was fitted with importance = 'permutation' or 'impurity'."
+    )
   }
-  
+
   importance_scores <- model$variable.importance
-  
+
   # Convert to tibble for easier manipulation
   importance_data <- tibble(
     variable = names(importance_scores),
     importance = as.numeric(importance_scores)
   )
-  
+
   # Sort by importance
   if (sort_ascending) {
-    importance_data <- importance_data %>% 
+    importance_data <- importance_data %>%
       arrange(importance)
   } else {
-    importance_data <- importance_data %>% 
+    importance_data <- importance_data %>%
       arrange(desc(importance))
   }
-  
+
   # Filter to top_n if specified
   if (!is.null(top_n) && is.numeric(top_n) && top_n > 0) {
-    importance_data <- importance_data %>% 
+    importance_data <- importance_data %>%
       slice_head(n = top_n)
   }
-  
+
   # Reorder factor levels for proper plotting order
   if (sort_ascending) {
-    importance_data$variable <- factor(importance_data$variable, 
-                                       levels = importance_data$variable)
+    importance_data$variable <- factor(
+      importance_data$variable,
+      levels = importance_data$variable
+    )
   } else {
-    importance_data$variable <- factor(importance_data$variable, 
-                                       levels = rev(importance_data$variable))
+    importance_data$variable <- factor(
+      importance_data$variable,
+      levels = rev(importance_data$variable)
+    )
   }
-  
+
   # Create base plot
   p <- ggplot(importance_data, aes(x = importance, y = variable)) +
     geom_col(fill = bar_color, alpha = bar_alpha, width = 0.7) +
@@ -148,27 +155,30 @@ plot_importance <- function(model,
       axis.text = element_text(size = 10),
       axis.text.y = element_text(hjust = 1)
     )
-  
+
   # Add value labels if requested
   if (show_values) {
     # Position labels at the right end of bars
     importance_data <- importance_data %>%
       mutate(
-        label_pos = ifelse(importance >= 0, importance + max(abs(importance)) * 0.02, 
-                           importance - max(abs(importance)) * 0.02),
+        label_pos = ifelse(
+          importance >= 0,
+          importance + max(abs(importance)) * 0.02,
+          importance - max(abs(importance)) * 0.02
+        ),
         label_hjust = ifelse(importance >= 0, 0, 1)
       )
-    
+
     p <- p +
       geom_text(
         data = importance_data,
         aes(x = label_pos, y = variable, label = round(importance, digits)),
-        color = "black",  # Changed to black for better visibility outside bars
+        color = "black", # Changed to black for better visibility outside bars
         size = text_size,
         hjust = importance_data$label_hjust
       )
   }
-  
+
   # Add threshold line if specified
   if (!is.null(threshold) && is.numeric(threshold)) {
     p <- p +
@@ -180,6 +190,6 @@ plot_importance <- function(model,
         size = 0.8
       )
   }
-  
+
   return(p)
 }

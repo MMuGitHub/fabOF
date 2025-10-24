@@ -13,12 +13,24 @@ print.fabOF <- function(x, ...) {
   cat("Observations:    ", x$ranger.fit$num.samples, "\n")
   cat("Covariates:      ", x$ranger.fit$num.independent.variables, "\n")
   cat("Target variable: ", x$target, "\n")
-  cat(paste0("Categories:       ", x$categories[1],
-             " (n = ", x$category.frequencies[1], ")", "\n"))
-  for(i in 2:length(x$categories)) {
-    cat(paste0("                  ", x$categories[i],
-               " (n = ", x$category.frequencies[i], ")", "\n"))
+  cat(paste0(
+    "Categories:       ",
+    x$categories[1],
+    " (n = ",
+    x$category.frequencies[1],
+    ")",
+    "\n"
+  ))
+  for (i in 2:length(x$categories)) {
+    cat(paste0(
+      "                  ",
+      x$categories[i],
+      " (n = ",
+      x$category.frequencies[i],
+      ")",
+      "\n"
+    ))
   }
-  cat("Category scores: ",  x$category.scores, "\n")
+  cat("Category scores: ", x$category.scores, "\n")
   cat("Category borders:", x$category.borders, "\n")
 }

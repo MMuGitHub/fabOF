@@ -57,49 +57,68 @@
 #'
 #' @import ranger
 #' @export
-mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, scores = NULL,
-                     importance = FALSE, importance.reps = 100, permute.clusterwise = FALSE, ranger.control = NULL) {
-
-  if(!class(formula) %in% c("formula", "character")) {
-    stop("Error: Argument 'formula' must either be of class formula or character.")
+mixfabOF <- function(
+  formula,
+  data,
+  random,
+  delta = 0.001,
+  max.iter = 100,
+  scores = NULL,
+  importance = FALSE,
+  importance.reps = 100,
+  permute.clusterwise = FALSE,
+  ranger.control = NULL
+) {
+  if (!class(formula) %in% c("formula", "character")) {
+    stop(
+      "Error: Argument 'formula' must either be of class formula or character."
+    )
   }
 
-  if(is.character(formula)) {
+  if (is.character(formula)) {
     formula <- as.formula(formula)
   }
 
   target <- toString(formula[[2]])
 
-  if(!is.factor(data[, target])) {
-    stop("Error: Target variable must be a factor variable (where the level order represents the order of the ordinal categories).")
+  if (!is.factor(data[, target])) {
+    stop(
+      "Error: Target variable must be a factor variable (where the level order represents the order of the ordinal categories)."
+    )
   }
-  if(length(target) != 1) {
-    stop("Error: Invalid length of target in formula. Only one target variable supported.")
+  if (length(target) != 1) {
+    stop(
+      "Error: Invalid length of target in formula. Only one target variable supported."
+    )
   }
 
   cats <- levels(data[, target])
   n.cats <- length(cats)
-  cat.idx <- sapply(data[, target], function(x) which(x == levels(data[, target])))
+  cat.idx <- sapply(data[, target], function(x) {
+    which(x == levels(data[, target]))
+  })
 
-  if(n.cats <= 1) {
+  if (n.cats <= 1) {
     stop("Error: Number of categories must be greater than 1.")
   }
 
-  if(is.null(scores)) {
+  if (is.null(scores)) {
     scores <- 1:n.cats
   } else {
-    if(!is.numeric(scores)) {
+    if (!is.numeric(scores)) {
       stop("Error: Provided scores must be numeric.")
     }
-    if(length(scores) != length(levels(data[, target]))) {
-      stop("Error: Must provide score for each ordinal response category level.")
+    if (length(scores) != length(levels(data[, target]))) {
+      stop(
+        "Error: Must provide score for each ordinal response category level."
+      )
     }
-    if(is.unsorted(scores)) {
+    if (is.unsorted(scores)) {
       stop("Error: Provided scores must be in ascending order.")
     }
   }
 
-  if(importance) {
+  if (importance) {
     ranger.control <- c(ranger.control, list(keep.inbag = TRUE))
   }
 
@@ -109,27 +128,27 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
   data.tmp <- data
   data.tmp[, target] <- scores[cat.idx]
 
-  if(is.character(random)) {
+  if (is.character(random)) {
     random <- as.formula(random)
   }
   random.string <- attr(terms(random, data = data), "term.labels")
   random.stripped <- gsub(" ", "", random.string)
   random.split <- strsplit(random.stripped, "\\|")[[1]]
 
-  if(length(random.split) == 1) {
+  if (length(random.split) == 1) {
     stop("Error: No grouping variable specified in random effect part.")
   }
 
   grp.var <- random.split[2]
 
-  if(!is.factor(data[, grp.var])) {
+  if (!is.factor(data[, grp.var])) {
     stop("Error: Grouping variable must be a factor variable.")
   }
 
   id <- data[, grp.var]
   ran.var <- strsplit(random.split[1], "\\+")[[1]]
 
-  if("1" %in% ran.var) {
+  if ("1" %in% ran.var) {
     Z <- as.matrix(cbind(1, data[, ran.var[ran.var != "1"]]))
   } else {
     Z <- as.matrix(data[, ran.var])
@@ -144,11 +163,11 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
   D.hat <- diag(1, n.re)
   eps.hat <- numeric(n.obs)
 
-  if(!is.numeric(delta) | delta <= 0) {
+  if (!is.numeric(delta) | delta <= 0) {
     stop("Error: delta must be a numeric value greater than 0.")
   }
 
-  if(!is.numeric(max.iter) | max.iter < 1) {
+  if (!is.numeric(max.iter) | max.iter < 1) {
     stop("Error: max.iter must be a positive integer value.")
   }
 
@@ -156,51 +175,64 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
   continue <- TRUE
   ll.old <- -Inf
 
-  while(continue) {
+  while (continue) {
     iter <- iter + 1
 
     y.star <- numeric(n.obs)
-    for(j in 1:n.grp) {
+    for (j in 1:n.grp) {
       id.j <- which(id == unique(id)[j])
-      y.star[id.j] <- y.num[id.j] - Z[id.j,, drop = FALSE] %*% b.hat[j,]
+      y.star[id.j] <- y.num[id.j] - Z[id.j, , drop = FALSE] %*% b.hat[j, ]
     }
 
     data.tmp[, target] <- y.star
 
-    ranger.fit <- do.call(ranger, c(list(formula = formula, data = data.tmp), ranger.control), quote = TRUE)
+    ranger.fit <- do.call(
+      ranger,
+      c(list(formula = formula, data = data.tmp), ranger.control),
+      quote = TRUE
+    )
     ranger.fit$call <- NULL
     f.hat <- ranger.fit$predictions
 
     D.hat.new <- matrix(0, ncol = n.re, nrow = n.re)
     sigma.sq.hat.new <- 0
 
-    for(j in 1:n.grp) {
+    for (j in 1:n.grp) {
       id.j <- which(id == unique(id)[j])
-      Z.j <- Z[id.j,, drop = FALSE]
+      Z.j <- Z[id.j, , drop = FALSE]
       V.j <- Z.j %*% D.hat %*% t(Z.j) + diag(sigma.sq.hat, length(id.j))
       V.j.inv <- solve(V.j)
 
-      b.hat[j,] <- D.hat %*% t(Z.j) %*% V.j.inv %*% (y.num[id.j] - f.hat[id.j])
-      eps.hat[id.j] <- y.num[id.j] - f.hat[id.j] - Z.j %*% b.hat[j,]
+      b.hat[j, ] <- D.hat %*% t(Z.j) %*% V.j.inv %*% (y.num[id.j] - f.hat[id.j])
+      eps.hat[id.j] <- y.num[id.j] - f.hat[id.j] - Z.j %*% b.hat[j, ]
 
-      D.hat.new <- D.hat.new + b.hat[j,] %*% t(b.hat[j,]) + D.hat -
+      D.hat.new <- D.hat.new +
+        b.hat[j, ] %*% t(b.hat[j, ]) +
+        D.hat -
         D.hat %*% t(Z.j) %*% V.j.inv %*% Z.j %*% D.hat
 
-      sigma.sq.hat.new <- sigma.sq.hat.new + t(eps.hat[id.j]) %*% eps.hat[id.j] +
+      sigma.sq.hat.new <- sigma.sq.hat.new +
+        t(eps.hat[id.j]) %*% eps.hat[id.j] +
         sigma.sq.hat * (length(id.j) - sigma.sq.hat * sum(diag(V.j.inv)))
     }
 
-    D.hat <- D.hat.new/n.grp
-    sigma.sq.hat <- as.numeric(sigma.sq.hat.new/n.obs)
+    D.hat <- D.hat.new / n.grp
+    sigma.sq.hat <- as.numeric(sigma.sq.hat.new / n.obs)
 
-    ll.new <- logLik(Z = Z, id = id, b.hat = b.hat, eps.hat = eps.hat,
-                     D.hat = D.hat, sigma.sq.hat = sigma.sq.hat)
+    ll.new <- logLik(
+      Z = Z,
+      id = id,
+      b.hat = b.hat,
+      eps.hat = eps.hat,
+      D.hat = D.hat,
+      sigma.sq.hat = sigma.sq.hat
+    )
 
-    if(iter > 1) {
-      if((ll.old - ll.new)/ll.old < delta) {
+    if (iter > 1) {
+      if ((ll.old - ll.new) / ll.old < delta) {
         continue <- FALSE
         conv <- TRUE
-      } else if(iter >= max.iter) {
+      } else if (iter >= max.iter) {
         continue <- FALSE
         conv <- FALSE
         warning("Warning: max.iter reached without convergence.")
@@ -212,35 +244,39 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
   rownames(b.hat) <- unique(id)
   pred <- numeric(n.obs)
 
-  for(j in 1:n.grp) {
+  for (j in 1:n.grp) {
     id.j <- which(id == unique(id)[j])
     grp.id <- which(rownames(b.hat) == unique(id)[j])
-    pred[id.j] <- f.hat[id.j] + Z[id.j,, drop = FALSE] %*% b.hat[j,]
+    pred[id.j] <- f.hat[id.j] + Z[id.j, , drop = FALSE] %*% b.hat[j, ]
   }
 
-  cum.prob.cats <- cumsum(table(data[, target])/n.obs)
-  cat.borders <- c(-Inf,
-                   as.numeric(quantile(pred, probs = c(cum.prob.cats[-n.cats]))),
-                   Inf)
+  cum.prob.cats <- cumsum(table(data[, target]) / n.obs)
+  cat.borders <- c(
+    -Inf,
+    as.numeric(quantile(pred, probs = c(cum.prob.cats[-n.cats]))),
+    Inf
+  )
 
   #browser()
-  
-  if(importance) {
-    pred.num <- sapply(pred, function(x) max(which(x >= cat.borders[1:length(cats)])))
+
+  if (importance) {
+    pred.num <- sapply(pred, function(x) {
+      max(which(x >= cat.borders[1:length(cats)]))
+    })
     pred.cat <- factor(cats[pred.num], levels = cats)
     orig.err <- linearKappa(data[, target], pred.cat)
     vars <- attr(terms(formula, data = data), "term.labels")
     perm.err <- matrix(0, nrow = length(vars), ncol = importance.reps)
     oob.mat <- do.call(cbind, ranger.fit$inbag.counts) < 1
 
-    for(v in 1:length(vars)) {
+    for (v in 1:length(vars)) {
       var.orig <- data.tmp[, vars[v]]
       print(v)
 
-      for(r in 1:importance.reps) {
+      for (r in 1:importance.reps) {
         print(r)
-        if(permute.clusterwise) {
-          for(j in 1:n.grp) {
+        if (permute.clusterwise) {
+          for (j in 1:n.grp) {
             id.j <- which(id == unique(id)[j])
             data.tmp[id.j, vars[v]] <- sample(var.orig[id.j])
           }
@@ -249,16 +285,23 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
           data.tmp[, vars[v]] <- var.perm
         }
 
-        pred.mat <- predict(ranger.fit, data.tmp, predict.all = TRUE)$predictions
+        pred.mat <- predict(
+          ranger.fit,
+          data.tmp,
+          predict.all = TRUE
+        )$predictions
         pred.oob <- rowSums(pred.mat * oob.mat) / rowSums(oob.mat)
 
-        for(j in 1:n.grp) {
+        for (j in 1:n.grp) {
           id.j <- which(id == unique(id)[j])
           grp.id <- which(rownames(b.hat) == unique(id)[j])
-          pred.oob[id.j] <- pred.oob[id.j] + Z[id.j,, drop = FALSE] %*% b.hat[j,]
+          pred.oob[id.j] <- pred.oob[id.j] +
+            Z[id.j, , drop = FALSE] %*% b.hat[j, ]
         }
 
-        pred.oob.num <- sapply(pred.oob, function(x) max(which(x >= cat.borders[1:length(cats)])))
+        pred.oob.num <- sapply(pred.oob, function(x) {
+          max(which(x >= cat.borders[1:length(cats)]))
+        })
         pred.oob.cat <- factor(cats[pred.oob.num], levels = cats)
 
         perm.err[v, r] <- linearKappa(data[, target], pred.oob.cat)
@@ -273,16 +316,23 @@ mixfabOF <- function(formula, data, random, delta = 0.001, max.iter = 100, score
 
   call <- sys.call()
 
-  result <- list(ranger.fit = ranger.fit, random.effects = b.hat,
-                 random.effect.var = D.hat, residual.var = sigma.sq.hat,
-                 categories = cats, category.borders = cat.borders,
-                 variable.importance = variable.importance,
-                 loglik = ll.new, call = call, iter = iter, conv = conv,
-                 formula = formula,
-                 random.formula = random)
+  result <- list(
+    ranger.fit = ranger.fit,
+    random.effects = b.hat,
+    random.effect.var = D.hat,
+    residual.var = sigma.sq.hat,
+    categories = cats,
+    category.borders = cat.borders,
+    variable.importance = variable.importance,
+    loglik = ll.new,
+    call = call,
+    iter = iter,
+    conv = conv,
+    formula = formula,
+    random.formula = random
+  )
 
   class(result) <- "mixfabOF"
 
   return(result)
-
 }
