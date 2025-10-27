@@ -39,12 +39,13 @@ plot_pdp(
   show_observed = TRUE,
   ridgeline_scale = 0.8,
   ridgeline_color = "lightgrey",
-  show_vertical_lines = TRUE,
+  show_border_lines = TRUE,
   seed = 42,
   cond_color_var = NULL,
   cond_color_levels = NULL,
   cond_color_palette = NULL,
   cond_color_title = NULL,
+  cond_color_legend_levels = NULL,
   cond_color_foreground = NULL,
   show_category_background = NULL
 )
@@ -63,11 +64,14 @@ If \code{FALSE} (default), returns only the plot.}
 
 \item{gridsize}{Integer. Number of points to evaluate in the grid for each variable. Default is 10.}
 
-\item{nmax}{Integer. Maximum number of rows sampled from \code{data} for ICE computation. Default is 500.}
+\item{nmax}{Integer. Maximum number of observations sampled from \code{data} for computing
+all ICE curves and the PDP mean. This controls computational cost and PDP accuracy.
+All \code{nmax} observations are used to calculate the aggregated PDP curve. Default is 500.}
 
-\item{nIce}{Integer or integer vector. If a single integer,
-specifies the number of ICE curves to sample randomly (default is 30).
-If a vector of integers, specifies the exact row indices of observations to use for ICE curves.}
+\item{nIce}{Integer or integer vector controlling which ICE curves to \strong{display} (sampled from the \code{nmax} computed curves).
+If a single integer, specifies the number of ICE curves to randomly sample for visualization (default is 30).
+If a vector of integers, specifies the exact row indices. This only affects visual clarity, not PDP computation.
+Must not exceed \code{nmax}.}
 
 \item{limits}{Optional numeric vector of y-axis limits. If \code{NULL}, computed from the data.}
 
@@ -129,8 +133,9 @@ Default is \code{TRUE}. Note: Not applicable for categorical X with conditional 
 \item{ridgeline_scale}{Numeric value controlling the height scaling of ridgeline
 plots for categorical variables. Default is 0.8.}
 
-\item{show_vertical_lines}{Logical. If \code{TRUE}, adds vertical dashed lines at category borders.
-Works for all plot types (continuous/categorical X, conditional/unconditional). Default is \code{TRUE}.}
+\item{show_border_lines}{Logical. If \code{TRUE}, adds dashed lines at category borders.
+For continuous X: horizontal lines at Y borders. For categorical X: vertical lines (due to coord_flip).
+Works independently of \code{show_category_background}. Default is \code{TRUE}.}
 
 \item{cond_color_var}{Character string specifying the name of a second predictor variable
 to use for conditional coloring of ICE curves. When specified, ICE curves are colored by this
@@ -146,6 +151,11 @@ If NULL, uses a default color palette. Length should match number of conditionin
 
 \item{cond_color_title}{Character string for the conditional color legend title.
 If NULL, uses the variable name from \code{cond_color_var}.}
+
+\item{cond_color_legend_levels}{Character vector specifying which levels to show in the legend.
+Useful when many levels are plotted but only a subset should appear in the legend (e.g., highlighting
+specific categories while others are shown in gray). If NULL (default), all levels from
+\code{cond_color_levels} appear in the legend. Only applicable when \code{cond_color_var} is specified.}
 
 \item{cond_color_foreground}{Character vector specifying the plotting order of conditioning variable
 levels from back to front (first element plotted first/in background, last element plotted last/in foreground).
@@ -180,6 +190,16 @@ background mapping. For categorical variables, it creates ridgeline plots showin
 the distribution of predictions for each category. test
 }
 \details{
+The function uses a two-stage sampling approach for computational efficiency:
+\enumerate{
+ \item \strong{Computation stage}: Sample \code{nmax} observations and compute ICE curves for all of them.
+  The PDP mean is calculated from all \code{nmax} curves, ensuring statistical accuracy.
+ \item \strong{Visualization stage}: Sample \code{nIce} curves from the \code{nmax} computed curves
+  to display in the plot, reducing visual clutter while maintaining accurate PDP estimates.
+}
+This design allows you to compute accurate PDP curves from a large sample (e.g., 500 observations)
+while displaying only a subset (e.g., 30 curves) for clarity.
+
 The function automatically detects the variable type based on the original data:
 \itemize{
  \item \strong{Categorical treatment}: Variables are treated as categorical if they are
@@ -287,6 +307,29 @@ plot <- plot_pdp(
  cond_color_var = "region",
  cond_color_levels = c("North", "South", "East", "West"),
  cond_color_foreground = c("North", "South", "East", "West")  # Explicit order: North in back, West on top
+)
+
+# Conditional ICE plot with selective legend display
+# Useful when plotting many categories but only highlighting a few in the legend
+# Example: Show all items in gray except specific ones of interest in color
+items_of_interest <- c("authorization", "organization", "civilization")
+all_items <- levels(dm_train$item)
+
+# Create color palette: gray for most items, viridis colors for items of interest
+color_palette <- rep("lightgray", length(all_items))
+color_palette[all_items \%in\% items_of_interest] <- viridisLite::viridis(length(items_of_interest))
+
+plot <- plot_pdp(
+ data = dm_train_dummy,
+ model = rf_ord_dummy,
+ response = "score",
+ x_var = "age",
+ x_var_title = "Age",
+ cond_color_var = "item",
+ cond_color_levels = all_items,  # Plot all items
+ cond_color_palette = color_palette,
+ cond_color_legend_levels = items_of_interest,  # Only show items of interest in legend
+ cond_color_title = "Selected Items"
 )
 }
 
