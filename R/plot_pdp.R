@@ -1128,18 +1128,9 @@ plot_pdp <- function(
     # Add PDP mean line(s)
     if (use_conditional_coloring) {
       # For conditional coloring: add BOTH overall and group-specific PDP lines
+      # Note: Overall PDP is added LAST so it appears on top
 
-      # First, add the overall/unconditional PDP mean line (marginal effect)
-      p <- p +
-        geom_line(
-          data = pdp_data,
-          aes(x = !!sym(x_var), y = fit),
-          color = pdp_linecolor,
-          linewidth = pdp_linewidth,
-          linetype = "solid"
-        )
-
-      # Then, add group-specific conditional PDP lines
+      # First, calculate and add group-specific conditional PDP lines
       # Calculate group-specific means using ALL ice_data (not just sampled)
       mean_data_continuous <- ice_data %>%
         filter(!is.na(cond_color_group)) %>%
@@ -1153,6 +1144,16 @@ plot_pdp <- function(
           aes(x = !!sym(x_var), y = mean_fit, color = cond_color_group),
           linewidth = cond_mean_linewidth,
           alpha = 1
+        )
+
+      # Then, add the overall/unconditional PDP mean line (marginal effect) on top
+      p <- p +
+        geom_line(
+          data = pdp_data,
+          aes(x = !!sym(x_var), y = fit),
+          color = pdp_linecolor,
+          linewidth = pdp_linewidth,
+          linetype = "solid"
         )
     } else {
       # No conditional coloring: add overall PDP mean line only
