@@ -30,6 +30,7 @@ plot_pdp(
   ice_pointsize = 3,
   pdp_linecolor = "#008080",
   pdp_linewidth = 0.5,
+  cond_mean_linewidth = NULL,
   pdp_intervalcolor = "black",
   pdp_meancolor = "#008080",
   pdp_meanfill = "black",
@@ -113,6 +114,10 @@ Default is 0.4.}
 Default is "black".}
 
 \item{pdp_linewidth}{Numeric value for the width of the PDP mean line. Default is 1.5.}
+
+\item{cond_mean_linewidth}{Numeric value for the width of the conditional PDP mean lines
+when \code{cond_color_var} is specified. If \code{NULL} (default), uses the same value as
+\code{pdp_linewidth}.}
 
 \item{pdp_intervalcolor}{Character string specifying the color of the interval lines for the PDP mean.
 Default is "black".}
@@ -212,9 +217,13 @@ The function automatically detects the variable type based on the original data:
  \item \strong{Conditional ICE plots}: When \code{cond_color_var} is specified, ICE curves
   are colored by a second predictor variable to explore potential interactions (as recommended
   by Strobl et al. 2024). For continuous x-variables, ICE lines are colored by the conditioning
-  variable. For categorical x-variables, separate density ridges are created for each combination
-  of the x-variable and conditioning variable levels. By default, category background coloring
-  is disabled when conditional coloring is active, showing only vertical lines at category borders.
+  variable, and BOTH the overall PDP (marginal effect) and group-specific conditional partial
+  dependence lines (c-PDPs) are displayed. The overall PDP shows the average effect across all
+  groups, while c-PDPs show the mean effect within each conditioning group. Comparing these lines
+  helps identify interactions. For categorical x-variables, separate density ridges are created
+  for each combination of the x-variable and conditioning variable levels, with group-specific
+  mean lines and points. By default, category background coloring is disabled when conditional
+  coloring is active, showing only vertical lines at category borders.
 }
 }
 \examples{
@@ -256,14 +265,15 @@ plot <- plot_pdp(
 )
 
 # Conditional ICE plot with continuous conditioning variable
-# Color ICE curves by income ranges
+# This displays group-specific conditional PDPs (c-PDPs) - the mean ICE curve
+# within each income range, useful for detecting interactions
 plot <- plot_pdp(
  data = dm_train_dummy,
  model = rf_ord_dummy,
  response = "score",
- x_var = "education",
- x_var_title = "Education Level",
- cond_color_var = "income",
+ x_var = "age",  # continuous X variable
+ x_var_title = "Age",
+ cond_color_var = "income",  # continuous conditioning variable
  cond_color_levels = list(
    "Low" = c(0, 30000),
    "Medium" = c(30000, 70000),
@@ -272,6 +282,11 @@ plot <- plot_pdp(
  cond_color_palette = c("#d73027", "#fee090", "#4575b4"),
  cond_color_title = "Income Range"
 )
+# The plot shows:
+# - ICE curves colored by income range
+# - Overall PDP line (marginal effect across all groups)
+# - Thicker conditional PDP lines (average effect within each income group)
+# Differences between conditional PDPs indicate an interaction effect
 
 # Conditional ICE plot with category background visible
 plot <- plot_pdp(
