@@ -14,6 +14,10 @@
 #'
 #' By setting \code{importance = TRUE}, permutation variable importance values can be computed. For the variable importance, predictive
 #' performance is assessed using weighted Cohen's Kappa with linear weights (see Buczak, 2024a and Buczak, 2024b for more details).
+#' Variable importance computation can be parallelized by setting \code{importance.parallel = TRUE}, which distributes
+#' permutation-prediction jobs across multiple CPU cores. This is particularly beneficial when using many importance repetitions
+#' or when running on high-performance computing systems with many available cores. If the \code{pbapply} package is installed,
+#' a progress bar will be displayed during parallel computation.
 #'
 #' For fitting the regression RF, the \code{ranger} package (Wright & Ziegler, 2017) is used. Arguments
 #' for \code{ranger} (e.g., \code{num.trees} or \code{mtry}) can be passed via the \code{ranger.control} argument as a list with named entries
@@ -32,6 +36,8 @@
 #' @param importance Compute permutation variable importance based on weighted Cohen's Kappa with linear weights.
 #' @param importance.reps Replications used for computing variable importance. High values increase stability of variable importance results but increase runtime.
 #' @param permute.clusterwise Should permutations only occur within the same cluster?
+#' @param importance.parallel Logical indicating whether to compute variable importance in parallel. Requires \code{parallel} package. Parallelizes over variable-repetition combinations to maximize core utilization (e.g., 7 variables x 100 reps = 700 parallel jobs).
+#' @param importance.n.cores Number of cores to use for parallel importance computation. If \code{NULL} and \code{importance.parallel = TRUE}, uses \code{parallel::detectCores() - 1}. All cores will be utilized even when number of variables is small.
 #' @param ranger.control List of arguments to pass to \code{ranger} function (e.g., num.trees, mtry, etc.). See \link[ranger]{ranger} documentation for a comprehensive overview of specifiable parameters.
 #' @return Fitted model object of class mixfabOF containing
 #'    \item{\code{ranger.fit}}{Forest object trained using numeric scores as target.}
@@ -44,7 +50,37 @@
 #'    \item{\code{call}}{Function call.}
 #'    \item{\code{loglik}}{Log-likelihood value in last iteration.}
 #' @examples
-#' \dontrun{}
+#' \dontrun{
+#' # Fit mixfabOF with variable importance (sequential)
+#' model <- mixfabOF(
+#'   formula = rating ~ predictor1 + predictor2,
+#'   data = mydata,
+#'   random = ~ (1|subject_id),
+#'   importance = TRUE,
+#'   importance.reps = 100
+#' )
+#'
+#' # Fit with parallel importance computation (auto-detect cores)
+#' model <- mixfabOF(
+#'   formula = rating ~ predictor1 + predictor2,
+#'   data = mydata,
+#'   random = ~ (1|subject_id),
+#'   importance = TRUE,
+#'   importance.reps = 100,
+#'   importance.parallel = TRUE
+#' )
+#'
+#' # Fit with parallel importance using specific number of cores (for HPC)
+#' model <- mixfabOF(
+#'   formula = rating ~ predictor1 + predictor2,
+#'   data = mydata,
+#'   random = ~ (1|subject_id),
+#'   importance = TRUE,
+#'   importance.reps = 100,
+#'   importance.parallel = TRUE,
+#'   importance.n.cores = 32
+#' )
+#' }
 #' @author Philip Buczak
 #' @references
 #' \itemize{
@@ -67,6 +103,8 @@ mixfabOF <- function(
   importance = FALSE,
   importance.reps = 100,
   permute.clusterwise = FALSE,
+  importance.parallel = FALSE,
+  importance.n.cores = NULL,
   ranger.control = NULL
 ) {
   if (!class(formula) %in% c("formula", "character")) {
@@ -269,45 +307,158 @@ mixfabOF <- function(
     perm.err <- matrix(0, nrow = length(vars), ncol = importance.reps)
     oob.mat <- do.call(cbind, ranger.fit$inbag.counts) < 1
 
-    for (v in 1:length(vars)) {
-      var.orig <- data.tmp[, vars[v]]
-      print(v)
+    # Sequential version (original code)
+    if (!importance.parallel) {
+      for (v in 1:length(vars)) {
+        var.orig <- data.tmp[, vars[v]]
+        print(v)
 
-      for (r in 1:importance.reps) {
-        print(r)
+        for (r in 1:importance.reps) {
+          print(r)
+          if (permute.clusterwise) {
+            for (j in 1:n.grp) {
+              id.j <- which(id == unique(id)[j])
+              data.tmp[id.j, vars[v]] <- sample(var.orig[id.j])
+            }
+          } else {
+            var.perm <- sample(var.orig)
+            data.tmp[, vars[v]] <- var.perm
+          }
+
+          pred.mat <- predict(
+            ranger.fit,
+            data.tmp,
+            predict.all = TRUE
+          )$predictions
+          pred.oob <- rowSums(pred.mat * oob.mat) / rowSums(oob.mat)
+
+          for (j in 1:n.grp) {
+            id.j <- which(id == unique(id)[j])
+            grp.id <- which(rownames(b.hat) == unique(id)[j])
+            pred.oob[id.j] <- pred.oob[id.j] +
+              Z[id.j, , drop = FALSE] %*% b.hat[j, ]
+          }
+
+          pred.oob.num <- sapply(pred.oob, function(x) {
+            max(which(x >= cat.borders[1:length(cats)]))
+          })
+          pred.oob.cat <- factor(cats[pred.oob.num], levels = cats)
+
+          perm.err[v, r] <- linearKappa(data[, target], pred.oob.cat)
+        }
+
+        data.tmp[, vars[v]] <- var.orig
+      }
+    } else {
+      # Parallel version
+      if (!requireNamespace("parallel", quietly = TRUE)) {
+        stop("Package 'parallel' is required for parallel importance computation.")
+      }
+
+      # Check for pbapply package for progress bar
+      use.pbapply <- requireNamespace("pbapply", quietly = TRUE)
+      if (!use.pbapply) {
+        message("Note: Install 'pbapply' package for progress bar support during parallel computation.")
+      }
+
+      # Determine number of cores
+      n.cores <- if (is.null(importance.n.cores)) {
+        max(1, parallel::detectCores() - 1)
+      } else {
+        importance.n.cores
+      }
+
+      # Create cluster
+      cl <- parallel::makeCluster(n.cores)
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+
+      # Export necessary objects to cluster
+      parallel::clusterExport(
+        cl,
+        varlist = c(
+          "data.tmp", "vars", "importance.reps", "permute.clusterwise",
+          "id", "n.grp", "ranger.fit", "oob.mat", "Z", "b.hat",
+          "cat.borders", "cats", "data", "target", "linearKappa"
+        ),
+        envir = environment()
+      )
+
+      # Load required packages on each worker
+      parallel::clusterEvalQ(cl, library(ranger))
+
+      # Strategy: Parallelize over variable-repetition combinations to maximize core usage
+      # Create all combinations of variables and repetitions
+      n.vars <- length(vars)
+      total.jobs <- n.vars * importance.reps
+      var.rep.combos <- expand.grid(v = 1:n.vars, r = 1:importance.reps)
+
+      cat(sprintf(
+        "Computing variable importance in parallel using %d cores for %d variables x %d reps = %d jobs...\n",
+        n.cores, n.vars, importance.reps, total.jobs
+      ))
+
+      # Function to compute one permutation for one variable
+      compute_single_permutation <- function(idx) {
+        v <- var.rep.combos$v[idx]
+        r <- var.rep.combos$r[idx]
+
+        # Make a local copy of data
+        data.local <- data.tmp
+        var.orig <- data.local[, vars[v]]
+
+        # Permute variable
         if (permute.clusterwise) {
           for (j in 1:n.grp) {
             id.j <- which(id == unique(id)[j])
-            data.tmp[id.j, vars[v]] <- sample(var.orig[id.j])
+            data.local[id.j, vars[v]] <- sample(var.orig[id.j])
           }
         } else {
           var.perm <- sample(var.orig)
-          data.tmp[, vars[v]] <- var.perm
+          data.local[, vars[v]] <- var.perm
         }
 
+        # Predict with permuted variable
         pred.mat <- predict(
           ranger.fit,
-          data.tmp,
+          data.local,
           predict.all = TRUE
         )$predictions
         pred.oob <- rowSums(pred.mat * oob.mat) / rowSums(oob.mat)
 
+        # Add random effects
         for (j in 1:n.grp) {
           id.j <- which(id == unique(id)[j])
-          grp.id <- which(rownames(b.hat) == unique(id)[j])
           pred.oob[id.j] <- pred.oob[id.j] +
             Z[id.j, , drop = FALSE] %*% b.hat[j, ]
         }
 
+        # Convert to categories and compute kappa
         pred.oob.num <- sapply(pred.oob, function(x) {
           max(which(x >= cat.borders[1:length(cats)]))
         })
         pred.oob.cat <- factor(cats[pred.oob.num], levels = cats)
 
-        perm.err[v, r] <- linearKappa(data[, target], pred.oob.cat)
+        kappa.val <- linearKappa(data[, target], pred.oob.cat)
+
+        return(list(v = v, r = r, kappa = kappa.val))
       }
 
-      data.tmp[, vars[v]] <- var.orig
+      # Run parallel computation with or without progress bar
+      pboptions(type = "timer", style = 3, char = "=")
+      if (use.pbapply) {
+        results <- pbapply::pblapply(
+          X = 1:total.jobs,
+          FUN = compute_single_permutation,
+          cl = cl
+        )
+      } else {
+        results <- parallel::parLapply(cl, 1:total.jobs, compute_single_permutation)
+      }
+
+      # Reorganize results into matrix form
+      for (res in results) {
+        perm.err[res$v, res$r] <- res$kappa
+      }
     }
 
     variable.importance <- orig.err - rowMeans(perm.err)

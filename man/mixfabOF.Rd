@@ -14,6 +14,8 @@ mixfabOF(
   importance = FALSE,
   importance.reps = 100,
   permute.clusterwise = FALSE,
+  importance.parallel = FALSE,
+  importance.n.cores = NULL,
   ranger.control = NULL
 )
 }
@@ -35,6 +37,10 @@ mixfabOF(
 \item{importance.reps}{Replications used for computing variable importance. High values increase stability of variable importance results but increase runtime.}
 
 \item{permute.clusterwise}{Should permutations only occur within the same cluster?}
+
+\item{importance.parallel}{Logical indicating whether to compute variable importance in parallel. Requires \code{parallel} package. Parallelizes over variable-repetition combinations to maximize core utilization (e.g., 7 variables x 100 reps = 700 parallel jobs).}
+
+\item{importance.n.cores}{Number of cores to use for parallel importance computation. If \code{NULL} and \code{importance.parallel = TRUE}, uses \code{parallel::detectCores() - 1}. All cores will be utilized even when number of variables is small.}
 
 \item{ranger.control}{List of arguments to pass to \code{ranger} function (e.g., num.trees, mtry, etc.). See \link[ranger]{ranger} documentation for a comprehensive overview of specifiable parameters.}
 }
@@ -68,6 +74,10 @@ change in log-likelihood is not achieved (specified via \code{delta}) or the max
 
 By setting \code{importance = TRUE}, permutation variable importance values can be computed. For the variable importance, predictive
 performance is assessed using weighted Cohen's Kappa with linear weights (see Buczak, 2024a and Buczak, 2024b for more details).
+Variable importance computation can be parallelized by setting \code{importance.parallel = TRUE}, which distributes
+permutation-prediction jobs across multiple CPU cores. This is particularly beneficial when using many importance repetitions
+or when running on high-performance computing systems with many available cores. If the \code{pbapply} package is installed,
+a progress bar will be displayed during parallel computation.
 
 For fitting the regression RF, the \code{ranger} package (Wright & Ziegler, 2017) is used. Arguments
 for \code{ranger} (e.g., \code{num.trees} or \code{mtry}) can be passed via the \code{ranger.control} argument as a list with named entries
@@ -76,7 +86,37 @@ of all parameters and their description. If left unspecified in the \code{ranger
 all parameters are initialized using their respective default from the \code{ranger} package.
 }
 \examples{
-\dontrun{}
+\dontrun{
+# Fit mixfabOF with variable importance (sequential)
+model <- mixfabOF(
+  formula = rating ~ predictor1 + predictor2,
+  data = mydata,
+  random = ~ (1|subject_id),
+  importance = TRUE,
+  importance.reps = 100
+)
+
+# Fit with parallel importance computation (auto-detect cores)
+model <- mixfabOF(
+  formula = rating ~ predictor1 + predictor2,
+  data = mydata,
+  random = ~ (1|subject_id),
+  importance = TRUE,
+  importance.reps = 100,
+  importance.parallel = TRUE
+)
+
+# Fit with parallel importance using specific number of cores (for HPC)
+model <- mixfabOF(
+  formula = rating ~ predictor1 + predictor2,
+  data = mydata,
+  random = ~ (1|subject_id),
+  importance = TRUE,
+  importance.reps = 100,
+  importance.parallel = TRUE,
+  importance.n.cores = 32
+)
+}
 }
 \references{
 \itemize{
