@@ -14,7 +14,9 @@
 #' @param x_var_title Character string specifying x-axis title.
 #' @param verbose Logical. If \code{TRUE}, returns a list with both data and plot.
 #'  If \code{FALSE} (default), returns only the plot.
-#' @param gridsize Integer. Number of points to evaluate in the grid for each variable. Default is 10.
+#' @param gridsize Integer or NULL. Number of points to evaluate in the grid for each variable.
+#'  If NULL, automatically set to the number of levels for categorical variables or 10 for continuous variables.
+#'  Default is 10.
 #' @param nmax Integer. Maximum number of observations sampled from \code{data} for computing
 #'  all ICE curves and the PDP mean. This controls computational cost and PDP accuracy.
 #'  All \code{nmax} observations are used to calculate the aggregated PDP curve. Default is 500.
@@ -372,11 +374,16 @@ plot_pdp <- function(
   if (use_conditional_coloring) {
     # Validate that the conditioning variable exists in data
     if (!cond_color_var %in% names(data)) {
-      stop(paste0("Conditioning variable '", cond_color_var, "' not found in data"))
+      stop(paste0(
+        "Conditioning variable '",
+        cond_color_var,
+        "' not found in data"
+      ))
     }
 
     # Check if conditioning variable is categorical or continuous
-    cond_var_is_categorical <- is.factor(data[[cond_color_var]]) || is.character(data[[cond_color_var]])
+    cond_var_is_categorical <- is.factor(data[[cond_color_var]]) ||
+      is.character(data[[cond_color_var]])
 
     # Set default title for conditioning variable legend
     if (is.null(cond_color_title)) {
@@ -398,14 +405,22 @@ plot_pdp <- function(
         # Default: use first 3-5 levels (up to 5, or all if fewer)
         n_default_levels <- min(5, length(all_levels))
         cond_color_levels <- all_levels[1:n_default_levels]
-        message(paste0("Using first ", n_default_levels, " levels of '", cond_color_var,
-                      "' for conditional coloring: ", paste(cond_color_levels, collapse = ", ")))
+        message(paste0(
+          "Using first ",
+          n_default_levels,
+          " levels of '",
+          cond_color_var,
+          "' for conditional coloring: ",
+          paste(cond_color_levels, collapse = ", ")
+        ))
       } else {
         # Validate user-specified levels
         invalid_levels <- setdiff(cond_color_levels, all_levels)
         if (length(invalid_levels) > 0) {
-          stop(paste0("Invalid levels specified in cond_color_levels: ",
-                     paste(invalid_levels, collapse = ", ")))
+          stop(paste0(
+            "Invalid levels specified in cond_color_levels: ",
+            paste(invalid_levels, collapse = ", ")
+          ))
         }
       }
 
@@ -413,38 +428,58 @@ plot_pdp <- function(
       if (is.null(cond_color_palette)) {
         cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
       } else if (length(cond_color_palette) != length(cond_color_levels)) {
-        warning(paste0("cond_color_palette has ", length(cond_color_palette),
-                      " colors but ", length(cond_color_levels), " levels specified. ",
-                      "Using default color palette instead."))
+        warning(paste0(
+          "cond_color_palette has ",
+          length(cond_color_palette),
+          " colors but ",
+          length(cond_color_levels),
+          " levels specified. ",
+          "Using default color palette instead."
+        ))
         cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
       }
 
       # Validate legend levels if provided
       if (!is.null(cond_color_legend_levels)) {
-        invalid_legend_levels <- setdiff(cond_color_legend_levels, cond_color_levels)
+        invalid_legend_levels <- setdiff(
+          cond_color_legend_levels,
+          cond_color_levels
+        )
         if (length(invalid_legend_levels) > 0) {
-          stop(paste0("Invalid levels specified in cond_color_legend_levels: ",
-                     paste(invalid_legend_levels, collapse = ", "),
-                     ". Must be a subset of cond_color_levels."))
+          stop(paste0(
+            "Invalid levels specified in cond_color_legend_levels: ",
+            paste(invalid_legend_levels, collapse = ", "),
+            ". Must be a subset of cond_color_levels."
+          ))
         }
       }
-
     } else {
       # Process continuous conditioning variable
       if (is.null(cond_color_levels)) {
-        stop("For continuous conditioning variables, cond_color_levels must be a named list specifying ranges, e.g., list('Low' = c(0, 5), 'High' = c(5, 10))")
+        stop(
+          "For continuous conditioning variables, cond_color_levels must be a named list specifying ranges, e.g., list('Low' = c(0, 5), 'High' = c(5, 10))"
+        )
       }
 
       # Validate that cond_color_levels is a named list
       if (!is.list(cond_color_levels) || is.null(names(cond_color_levels))) {
-        stop("For continuous conditioning variables, cond_color_levels must be a named list")
+        stop(
+          "For continuous conditioning variables, cond_color_levels must be a named list"
+        )
       }
 
       # Validate that each element is a numeric vector of length 2
       for (i in seq_along(cond_color_levels)) {
-        if (!is.numeric(cond_color_levels[[i]]) || length(cond_color_levels[[i]]) != 2) {
-          stop(paste0("Each range in cond_color_levels must be a numeric vector of length 2. ",
-                     "Problem with '", names(cond_color_levels)[i], "'"))
+        if (
+          !is.numeric(cond_color_levels[[i]]) ||
+            length(cond_color_levels[[i]]) != 2
+        ) {
+          stop(paste0(
+            "Each range in cond_color_levels must be a numeric vector of length 2. ",
+            "Problem with '",
+            names(cond_color_levels)[i],
+            "'"
+          ))
         }
         # Ensure ranges are ordered
         cond_color_levels[[i]] <- sort(cond_color_levels[[i]])
@@ -454,19 +489,29 @@ plot_pdp <- function(
       if (is.null(cond_color_palette)) {
         cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
       } else if (length(cond_color_palette) != length(cond_color_levels)) {
-        warning(paste0("cond_color_palette has ", length(cond_color_palette),
-                      " colors but ", length(cond_color_levels), " ranges specified. ",
-                      "Using default color palette instead."))
+        warning(paste0(
+          "cond_color_palette has ",
+          length(cond_color_palette),
+          " colors but ",
+          length(cond_color_levels),
+          " ranges specified. ",
+          "Using default color palette instead."
+        ))
         cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
       }
 
       # Validate legend levels if provided
       if (!is.null(cond_color_legend_levels)) {
-        invalid_legend_levels <- setdiff(cond_color_legend_levels, names(cond_color_levels))
+        invalid_legend_levels <- setdiff(
+          cond_color_legend_levels,
+          names(cond_color_levels)
+        )
         if (length(invalid_legend_levels) > 0) {
-          stop(paste0("Invalid range names specified in cond_color_legend_levels: ",
-                     paste(invalid_legend_levels, collapse = ", "),
-                     ". Must be a subset of names in cond_color_levels."))
+          stop(paste0(
+            "Invalid range names specified in cond_color_legend_levels: ",
+            paste(invalid_legend_levels, collapse = ", "),
+            ". Must be a subset of names in cond_color_levels."
+          ))
         }
       }
     }
@@ -490,12 +535,20 @@ plot_pdp <- function(
 
   # Validate nIce against nmax
   if (length(nIce) == 1 && nIce > nrow(data_clean)) {
-    stop(paste0("nIce (", nIce, ") cannot exceed nmax (", nrow(data_clean),
-                "). Increase nmax or decrease nIce."))
+    stop(paste0(
+      "nIce (",
+      nIce,
+      ") cannot exceed nmax (",
+      nrow(data_clean),
+      "). Increase nmax or decrease nIce."
+    ))
   }
   if (length(nIce) > 1 && any(nIce > nrow(data_clean))) {
-    stop(paste0("Some indices in nIce exceed nmax (", nrow(data_clean),
-                "). Provide valid row indices within the nmax sample."))
+    stop(paste0(
+      "Some indices in nIce exceed nmax (",
+      nrow(data_clean),
+      "). Provide valid row indices within the nmax sample."
+    ))
   }
 
   # ICE curve sampling
@@ -505,6 +558,25 @@ plot_pdp <- function(
   } else {
     nIce <- min(nIce, nrow(data_clean))
     sice <- c(NA, sample(1:nrow(data_clean), nIce))
+  }
+
+  # Gridsize input check: Set default based on variable type if NULL
+  if (is.null(gridsize)) {
+    if (is_categorical) {
+      # For categorical variables: use number of levels
+      gridsize <- length(levels(data[[x_var]]))
+      message(paste0(
+        "gridsize set to ",
+        gridsize,
+        " (number of levels in '",
+        x_var,
+        "')"
+      ))
+    } else {
+      # For continuous variables: use default of 10
+      gridsize <- 10
+      message("gridsize set to 10 (default for continuous variables)")
+    }
   }
 
   # Create grid data for each variable
@@ -573,18 +645,26 @@ plot_pdp <- function(
   # ============================================================================
 
   if (use_conditional_coloring) {
-
     # Create color grouping variable
     if (cond_var_is_categorical) {
       # For categorical: filter to selected levels and create color group
       ice_data <- ice_data %>%
         filter(!!sym(cond_color_var) %in% cond_color_levels) %>%
-        mutate(cond_color_group = factor(!!sym(cond_color_var), levels = cond_color_levels))
+        mutate(
+          cond_color_group = factor(
+            !!sym(cond_color_var),
+            levels = cond_color_levels
+          )
+        )
 
       ice_data_sample <- ice_data_sample %>%
         filter(!!sym(cond_color_var) %in% cond_color_levels) %>%
-        mutate(cond_color_group = factor(!!sym(cond_color_var), levels = cond_color_levels))
-
+        mutate(
+          cond_color_group = factor(
+            !!sym(cond_color_var),
+            levels = cond_color_levels
+          )
+        )
     } else {
       # For continuous: assign to ranges
       cond_var_values <- ice_data[[cond_color_var]]
@@ -601,17 +681,25 @@ plot_pdp <- function(
       }
 
       # Assign range labels to each observation
-      ice_data$cond_color_group <- sapply(ice_data[[cond_color_var]],
-                                          assign_range,
-                                          ranges = cond_color_levels)
-      ice_data$cond_color_group <- factor(ice_data$cond_color_group,
-                                          levels = names(cond_color_levels))
+      ice_data$cond_color_group <- sapply(
+        ice_data[[cond_color_var]],
+        assign_range,
+        ranges = cond_color_levels
+      )
+      ice_data$cond_color_group <- factor(
+        ice_data$cond_color_group,
+        levels = names(cond_color_levels)
+      )
 
-      ice_data_sample$cond_color_group <- sapply(ice_data_sample[[cond_color_var]],
-                                                  assign_range,
-                                                  ranges = cond_color_levels)
-      ice_data_sample$cond_color_group <- factor(ice_data_sample$cond_color_group,
-                                                  levels = names(cond_color_levels))
+      ice_data_sample$cond_color_group <- sapply(
+        ice_data_sample[[cond_color_var]],
+        assign_range,
+        ranges = cond_color_levels
+      )
+      ice_data_sample$cond_color_group <- factor(
+        ice_data_sample$cond_color_group,
+        levels = names(cond_color_levels)
+      )
 
       # Filter out observations not in any range
       ice_data <- ice_data %>% filter(!is.na(cond_color_group))
@@ -681,7 +769,7 @@ plot_pdp <- function(
       max(c(ice_data_sample$fit, pdp_data$fit))
     ))
   }
-  
+
   # Get x-axis range for background rectangles
   if (is_categorical) {
     # For categorical variables, create range based on factor levels
@@ -812,8 +900,9 @@ plot_pdp <- function(
       ridgeline_data <- ridgeline_data %>%
         mutate(
           # Create a combined y-position that separates densities
-          y_position = x_value + (as.numeric(cond_color_group) - 1) * 0.15 -
-                       (n_cond_levels - 1) * 0.15 / 2
+          y_position = x_value +
+            (as.numeric(cond_color_group) - 1) * 0.15 -
+            (n_cond_levels - 1) * 0.15 / 2
         )
 
       # Create labels for y-axis (only show x_var labels at main positions)
@@ -829,8 +918,9 @@ plot_pdp <- function(
         summarise(mean_fit = mean(fit), .groups = "drop") %>%
         mutate(
           # Adjust y position to match ridgeline positions
-          y_position = x_value + (as.numeric(cond_color_group) - 1) * 0.15 -
-                       (n_cond_levels - 1) * 0.15 / 2
+          y_position = x_value +
+            (as.numeric(cond_color_group) - 1) * 0.15 -
+            (n_cond_levels - 1) * 0.15 / 2
         )
 
       p <- ggplot(data = ridgeline_data) +
@@ -874,7 +964,11 @@ plot_pdp <- function(
         scale_fill_manual(
           values = cond_color_scale,
           name = cond_color_title,
-          breaks = if (!is.null(cond_color_legend_levels)) cond_color_legend_levels else waiver(),
+          breaks = if (!is.null(cond_color_legend_levels)) {
+            cond_color_legend_levels
+          } else {
+            waiver()
+          },
           na.translate = FALSE
         ) +
         # Add scale_y_continuous to restore original factor labels
@@ -909,7 +1003,6 @@ plot_pdp <- function(
             alpha = 0.8
           )
       }
-
     } else {
       # Unconditional categorical X plot
       # Prepare data for ridgelines - group ICE curves by x_var value
@@ -924,7 +1017,11 @@ plot_pdp <- function(
             group = .data$x_value,
             x = fit,
             fill = if (show_category_background && is.numeric(borders)) {
-              after_stat(cut(x, breaks = borders))
+              after_stat(cut(
+                x,
+                breaks = borders,
+                labels = category_names[1:(length(borders) - 1)]
+              ))
             } else {
               NULL
             }
@@ -966,7 +1063,7 @@ plot_pdp <- function(
             group_by(x_value) %>%
             summarise(mean_fit = mean(fit), .groups = "drop"),
           mapping = aes(y = x_value, x = mean_fit),
-          color = pdp_meancolor,
+          color = pdp_linecolor,
           size = pdp_linewidth,
           position = position_nudge(y = -0.05)
         ) +
@@ -1007,9 +1104,12 @@ plot_pdp <- function(
       if (show_category_background && is.numeric(borders)) {
         p <- p +
           scale_fill_manual(
-            values = scales::alpha(
-              category_colors[1:(length(borders) - 1)],
-              alpha = category_alpha
+            values = setNames(
+              scales::alpha(
+                category_colors[1:(length(borders) - 1)],
+                alpha = category_alpha
+              ),
+              nm = category_names[1:(length(borders) - 1)]
             ),
             name = category_title,
             labels = category_names[1:(length(borders) - 1)]
@@ -1047,7 +1147,9 @@ plot_pdp <- function(
       # Handle custom plotting order
       if (!is.null(cond_color_foreground)) {
         # Get available levels
-        available_levels <- unique(as.character(ice_data_sample$cond_color_group))
+        available_levels <- unique(as.character(
+          ice_data_sample$cond_color_group
+        ))
         available_levels <- available_levels[!is.na(available_levels)]
 
         # Validate provided order
@@ -1055,10 +1157,12 @@ plot_pdp <- function(
         invalid_levels <- setdiff(fg_order, available_levels)
 
         if (length(invalid_levels) > 0) {
-          warning(paste0("cond_color_foreground contains invalid levels: ",
-                        paste(invalid_levels, collapse = ", "),
-                        ". Available levels: ",
-                        paste(available_levels, collapse = ", ")))
+          warning(paste0(
+            "cond_color_foreground contains invalid levels: ",
+            paste(invalid_levels, collapse = ", "),
+            ". Available levels: ",
+            paste(available_levels, collapse = ", ")
+          ))
           # Remove invalid levels
           fg_order <- intersect(fg_order, available_levels)
         }
@@ -1067,11 +1171,16 @@ plot_pdp <- function(
         missing_levels <- setdiff(available_levels, fg_order)
         if (length(missing_levels) > 0) {
           fg_order <- c(missing_levels, fg_order)
-          message(paste0("Levels not in cond_color_foreground will be plotted in background: ",
-                        paste(missing_levels, collapse = ", ")))
+          message(paste0(
+            "Levels not in cond_color_foreground will be plotted in background: ",
+            paste(missing_levels, collapse = ", ")
+          ))
         }
 
-        message(paste0("Plotting order (back to front): ", paste(fg_order, collapse = " < ")))
+        message(paste0(
+          "Plotting order (back to front): ",
+          paste(fg_order, collapse = " < ")
+        ))
 
         # Plot each level as a separate layer in the specified order
         for (level in fg_order) {
@@ -1081,7 +1190,12 @@ plot_pdp <- function(
           p <- p +
             geom_line(
               data = level_data,
-              aes(x = !!sym(x_var), y = fit, group = .id, color = cond_color_group),
+              aes(
+                x = !!sym(x_var),
+                y = fit,
+                group = .id,
+                color = cond_color_group
+              ),
               #alpha = ice_alpha,
               linewidth = ice_linewidth
             )
@@ -1092,16 +1206,24 @@ plot_pdp <- function(
           scale_color_manual(
             values = cond_color_scale,
             name = cond_color_title,
-            breaks = if (!is.null(cond_color_legend_levels)) cond_color_legend_levels else waiver(),
+            breaks = if (!is.null(cond_color_legend_levels)) {
+              cond_color_legend_levels
+            } else {
+              waiver()
+            },
             na.translate = FALSE
           )
-
       } else {
         # No custom order specified, plot normally
         p <- p +
           geom_line(
             data = ice_data_sample,
-            aes(x = !!sym(x_var), y = fit, group = .id, color = cond_color_group),
+            aes(
+              x = !!sym(x_var),
+              y = fit,
+              group = .id,
+              color = cond_color_group
+            ),
             alpha = ice_alpha,
             linewidth = ice_linewidth
           ) +
@@ -1109,7 +1231,11 @@ plot_pdp <- function(
           scale_color_manual(
             values = cond_color_scale,
             name = cond_color_title,
-            breaks = if (!is.null(cond_color_legend_levels)) cond_color_legend_levels else waiver(),
+            breaks = if (!is.null(cond_color_legend_levels)) {
+              cond_color_legend_levels
+            } else {
+              waiver()
+            },
             na.translate = FALSE
           )
       }

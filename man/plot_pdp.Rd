@@ -63,7 +63,9 @@ plot_pdp(
 \item{verbose}{Logical. If \code{TRUE}, returns a list with both data and plot.
 If \code{FALSE} (default), returns only the plot.}
 
-\item{gridsize}{Integer. Number of points to evaluate in the grid for each variable. Default is 10.}
+\item{gridsize}{Integer or NULL. Number of points to evaluate in the grid for each variable.
+If NULL, automatically set to the number of levels for categorical variables or 10 for continuous variables.
+Default is 10.}
 
 \item{nmax}{Integer. Maximum number of observations sampled from \code{data} for computing
 all ICE curves and the PDP mean. This controls computational cost and PDP accuracy.
