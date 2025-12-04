@@ -3,7 +3,8 @@
 #' @title Predict mixfabOF
 #' @param object Fitted mixfabOF model object.
 #' @param newdata Dataset containing new observations to be predicted.
-#' @return Predicted ordinal response category labels.
+#' @param type Character string specifying the type of prediction. Either "response" (default) for ordinal category predictions or "latent" for latent variable predictions.
+#' @return Predicted ordinal response category labels (if type = "response") or numeric latent variable predictions (if type = "latent").
 #' @author Philip Buczak
 #' @export
 predict.mixfabOF <-

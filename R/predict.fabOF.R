@@ -3,10 +3,11 @@
 #' @title Predict fabOF
 #' @param object Fitted fabOF model object.
 #' @param newdata Dataset containing new observations to be predicted.
-#' @return Predicted ordinal response category labels.
+#' @param type Character string specifying the type of prediction. Either "response" (default) for ordinal category predictions or "latent" for latent variable predictions.
+#' @return Predicted ordinal response category labels (if type = "response") or numeric latent variable predictions (if type = "latent").
 #' @author Philip Buczak
 #' @export
-predict.fabOF <- function(object, newdata, ...) {
+predict.fabOF <- function(object, newdata, type = c("response", "latent"), ...) {
   if (!inherits(object, "fabOF")) {
     stop("Error: Object class must be fabOF.")
   }
@@ -16,10 +17,15 @@ predict.fabOF <- function(object, newdata, ...) {
 
   cats <- object$categories
   pred <- predict(object$ranger.fit, newdata)$predictions
-  # Inspired by Roman Hornung's ordinalForest R package
-  pred.num <- sapply(pred, function(x) {
-    max(which(x >= object$category.borders[1:length(cats)]))
-  })
-  pred.cat <- factor(cats[pred.num], levels = cats)
-  return(pred.cat)
+
+  if (type == "latent") {
+    return(pred)
+  } else {
+    # Inspired by Roman Hornung's ordinalForest R package
+    pred.num <- sapply(pred, function(x) {
+      max(which(x >= object$category.borders[1:length(cats)]))
+    })
+    pred.cat <- factor(cats[pred.num], levels = cats)
+    return(pred.cat)
+  }
 }
