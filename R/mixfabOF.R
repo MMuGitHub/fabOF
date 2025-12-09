@@ -361,12 +361,23 @@ mixfabOF <- function(
         message("Note: Install 'pbapply' package for progress bar support during parallel computation.")
       }
 
-      # Determine number of cores
-      n.cores <- if (is.null(importance.n.cores)) {
+      # Determine number of cores and threads
+      # Strategy: Balance workers and threads for optimal ranger prediction performance
+      total.cores <- if (is.null(importance.n.cores)) {
         max(1, parallel::detectCores() - 1)
       } else {
         importance.n.cores
       }
+
+      # Use sqrt(total_cores) workers with sqrt(total_cores) threads each
+      # This balances ranger's multithreading with parallelization across jobs
+      threads.per.worker <- max(1, round(sqrt(total.cores)))
+      n.cores <- max(1, round(total.cores / threads.per.worker))
+
+      cat(sprintf(
+        "Parallel configuration: %d workers × %d threads = %d total cores\n",
+        n.cores, threads.per.worker, n.cores * threads.per.worker
+      ))
 
       # Create cluster
       cl <- parallel::makeCluster(n.cores)
@@ -378,13 +389,18 @@ mixfabOF <- function(
         varlist = c(
           "data.tmp", "vars", "importance.reps", "permute.clusterwise",
           "id", "n.grp", "ranger.fit", "oob.mat", "Z", "b.hat",
-          "cat.borders", "cats", "data", "target", "linearKappa"
+          "cat.borders", "cats", "data", "target", "linearKappa",
+          "threads.per.worker"
         ),
         envir = environment()
       )
 
-      # Load required packages on each worker
-      parallel::clusterEvalQ(cl, library(ranger))
+      # Load required packages and set thread count on each worker
+      parallel::clusterEvalQ(cl, {
+        library(ranger)
+        # Each worker uses threads.per.worker threads for ranger operations
+        options(ranger.num.threads = threads.per.worker)
+      })
 
       # Strategy: Parallelize over variable-repetition combinations to maximize core usage
       # Create all combinations of variables and repetitions
@@ -443,17 +459,38 @@ mixfabOF <- function(
         return(list(v = v, r = r, kappa = kappa.val))
       }
 
-      # Run parallel computation with or without progress bar
+      # Chunking strategy: Send jobs in batches to reduce dispatch overhead
+      # Calculate optimal chunk size: total_jobs / (n_workers * factor)
+      # Factor of 5-10 balances load distribution and communication overhead
+      chunk.size <- max(1, ceiling(total.jobs / (n.cores * 8)))
+
+      cat(sprintf(
+        "Using chunk size of %d jobs per batch (%d total batches)\n",
+        chunk.size, ceiling(total.jobs / chunk.size)
+      ))
+
+      # Split jobs into chunks
+      job.chunks <- split(1:total.jobs, ceiling(seq_along(1:total.jobs) / chunk.size))
+
+      # Function to process a chunk of jobs
+      process_chunk <- function(indices) {
+        lapply(indices, compute_single_permutation)
+      }
+
+      # Run parallel computation with chunking
       pboptions(type = "timer", style = 3, char = "=")
       if (use.pbapply) {
-        results <- pbapply::pblapply(
-          X = 1:total.jobs,
-          FUN = compute_single_permutation,
+        chunk.results <- pbapply::pblapply(
+          X = job.chunks,
+          FUN = process_chunk,
           cl = cl
         )
       } else {
-        results <- parallel::parLapply(cl, 1:total.jobs, compute_single_permutation)
+        chunk.results <- parallel::parLapplyLB(cl, job.chunks, process_chunk)
       }
+
+      # Flatten nested list structure
+      results <- unlist(chunk.results, recursive = FALSE)
 
       # Reorganize results into matrix form
       for (res in results) {
