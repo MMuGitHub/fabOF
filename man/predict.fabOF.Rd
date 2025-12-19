@@ -4,15 +4,17 @@
 \alias{predict.fabOF}
 \title{Predict fabOF}
 \usage{
-\method{predict}{fabOF}(object, newdata, ...)
+\method{predict}{fabOF}(object, newdata, type = c("response", "latent"), ...)
 }
 \arguments{
 \item{object}{Fitted fabOF model object.}
 
 \item{newdata}{Dataset containing new observations to be predicted.}
+
+\item{type}{Character string specifying the type of prediction. Either "response" (default) for ordinal category predictions or "latent" for latent variable predictions.}
 }
 \value{
-Predicted ordinal response category labels.
+Predicted ordinal response category labels (if type = "response") or numeric latent variable predictions (if type = "latent").
 }
 \description{
 Predicts ordinal response categories for new observations using a fabOF model fit.

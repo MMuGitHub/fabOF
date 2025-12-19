@@ -10,9 +10,11 @@
 \item{object}{Fitted mixfabOF model object.}
 
 \item{newdata}{Dataset containing new observations to be predicted.}
+
+\item{type}{Character string specifying the type of prediction. Either "response" (default) for ordinal category predictions or "latent" for latent variable predictions.}
 }
 \value{
-Predicted ordinal response category labels.
+Predicted ordinal response category labels (if type = "response") or numeric latent variable predictions (if type = "latent").
 }
 \description{
 Predicts ordinal response categories for new observations using a mixfabOF model fit. For unknown clusters, prediction is performed based on the fixed effects only.
