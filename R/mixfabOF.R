@@ -478,8 +478,8 @@ mixfabOF <- function(
       }
 
       # Run parallel computation with chunking
-      pboptions(type = "timer", style = 3, char = "=")
       if (use.pbapply) {
+        pbapply::pboptions(type = "timer", style = 3, char = "=")
         chunk.results <- pbapply::pblapply(
           X = job.chunks,
           FUN = process_chunk,

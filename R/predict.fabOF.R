@@ -6,6 +6,9 @@
 #' @param type Character string specifying the type of prediction. Either "response" (default) for ordinal category predictions or "latent" for latent variable predictions.
 #' @return Predicted ordinal response category labels (if type = "response") or numeric latent variable predictions (if type = "latent").
 #' @author Philip Buczak
+#' @importFrom stats predict terms as.formula na.omit quantile setNames
+#' @importFrom grDevices chull
+#' @importFrom utils head
 #' @export
 predict.fabOF <- function(object, newdata, type = c("response", "latent"), ...) {
   if (!inherits(object, "fabOF")) {

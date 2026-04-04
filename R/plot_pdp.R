@@ -1,3 +1,9 @@
+# Internal: replicate ggplot2's default hue palette
+.default_hue_pal <- function(n) {
+  hues <- seq(15, 375, length.out = n + 1)[1:n]
+  grDevices::hcl(h = hues, c = 100, l = 65)
+}
+
 #' Create Partial Dependence Plot with Individual Conditional Expectation Lines
 #'
 #' This function creates partial dependence plots (PDP) with individual conditional
@@ -259,9 +265,6 @@
 #' @import ggplot2
 #' @import dplyr
 #' @import ggridges
-#' @importFrom condvis2 CVpredict
-#' @importFrom tibble as_tibble
-#' @importFrom labeling rpretty
 #' @importFrom rlang sym
 #'
 #' @export
@@ -315,11 +318,6 @@ plot_pdp <- function(
   require(ggplot2)
   require(dplyr)
   require(ggridges)
-  require(condvis2)
-  require(tibble)
-  require(labeling)
-  require(lme4)
-
   if (!is.null(seed)) {
     set.seed(seed)
   }
@@ -348,10 +346,17 @@ plot_pdp <- function(
   # Create vector of variable names used in the model
   vars <- fit$forest$independent.variable.names
 
-  # Add random effect name:
-  random_terms <- lme4::findbars(model$random.formula)
-  randeff_name <- as.character(random_terms[[1]][[3]])
-  vars_with_randeff <- c(vars, randeff_name)
+  # Add random effect name (for mixfabOF models with random effects)
+  if (inherits(model, "mixfabOF")) {
+    random.string <- attr(stats::terms(model$random.formula), "term.labels")
+    random.stripped <- gsub(" ", "", random.string)
+    random.split <- strsplit(random.stripped, "\\|")[[1]]
+    randeff_name <- random.split[2]
+    vars_with_randeff <- c(vars, randeff_name)
+  } else {
+    vars_with_randeff <- vars
+    randeff_name <- NULL
+  }
 
   # Now check the specific plotting variable type AFTER transformation
 
@@ -426,7 +431,7 @@ plot_pdp <- function(
 
       # Set default color palette if not provided
       if (is.null(cond_color_palette)) {
-        cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
+        cond_color_palette <- .default_hue_pal(length(cond_color_levels))
       } else if (length(cond_color_palette) != length(cond_color_levels)) {
         warning(paste0(
           "cond_color_palette has ",
@@ -436,7 +441,7 @@ plot_pdp <- function(
           " levels specified. ",
           "Using default color palette instead."
         ))
-        cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
+        cond_color_palette <- .default_hue_pal(length(cond_color_levels))
       }
 
       # Validate legend levels if provided
@@ -487,7 +492,7 @@ plot_pdp <- function(
 
       # Set default color palette if not provided
       if (is.null(cond_color_palette)) {
-        cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
+        cond_color_palette <- .default_hue_pal(length(cond_color_levels))
       } else if (length(cond_color_palette) != length(cond_color_levels)) {
         warning(paste0(
           "cond_color_palette has ",
@@ -497,7 +502,7 @@ plot_pdp <- function(
           " ranges specified. ",
           "Using default color palette instead."
         ))
-        cond_color_palette <- scales::hue_pal()(length(cond_color_levels))
+        cond_color_palette <- .default_hue_pal(length(cond_color_levels))
       }
 
       # Validate legend levels if provided
@@ -719,9 +724,9 @@ plot_pdp <- function(
 
   # Create data list
   pdp_data_list <- list(
-    ice_data = tibble::as_tibble(ice_data),
+    ice_data = as.data.frame(ice_data),
     ice_data_sample = ice_data_sample,
-    pdp_data = tibble::as_tibble(aggr)
+    pdp_data = as.data.frame(aggr)
   )
 
   # ============================================================================
@@ -756,18 +761,16 @@ plot_pdp <- function(
     # colors <- c('#4DAF4A', '#2d5d85ff', '#FFFF33', '#FF7F00', '#E41A1C')
     # color_palette <- colorRampPalette(colors)
     # category_colors <- color_palette(length(borders) - 1)
-    category_colors <- paletteer::paletteer_d(
-      "PNWColors::Bay",
-      n = length(borders) - 1
-    )
+    bay_colors <- c("#00496F", "#0F85A0", "#EDD746", "#ED8B00", "#DD4124")
+    category_colors <- grDevices::colorRampPalette(bay_colors)(length(borders) - 1)
   }
 
   # Get limits for y-axis
   if (is.null(limits)) {
-    limits <- range(labeling::rpretty(
+    limits <- range(pretty(c(
       min(c(ice_data_sample$fit, pdp_data$fit)),
       max(c(ice_data_sample$fit, pdp_data$fit))
-    ))
+    )))
   }
 
   # Get x-axis range for background rectangles
@@ -1105,9 +1108,9 @@ plot_pdp <- function(
         p <- p +
           scale_fill_manual(
             values = setNames(
-              scales::alpha(
+              grDevices::adjustcolor(
                 category_colors[1:(length(borders) - 1)],
-                alpha = category_alpha
+                alpha.f = category_alpha
               ),
               nm = category_names[1:(length(borders) - 1)]
             ),

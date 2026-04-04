@@ -61,8 +61,6 @@
 #' }
 #'
 #' @import ggplot2
-#' @import dplyr
-#' @importFrom tibble tibble
 #'
 #' @export
 plot_importance <- function(
@@ -84,8 +82,6 @@ plot_importance <- function(
 ) {
   # Load required libraries
   require(ggplot2)
-  require(dplyr)
-  require(tibble)
 
   # Input validation
   if (!inherits(model, c("mixfabOF", "fabOF"))) {
@@ -101,25 +97,23 @@ plot_importance <- function(
 
   importance_scores <- model$variable.importance
 
-  # Convert to tibble for easier manipulation
-  importance_data <- tibble(
+  # Convert to data frame for manipulation
+  importance_data <- data.frame(
     variable = names(importance_scores),
-    importance = as.numeric(importance_scores)
+    importance = as.numeric(importance_scores),
+    stringsAsFactors = FALSE
   )
 
   # Sort by importance
   if (sort_ascending) {
-    importance_data <- importance_data %>%
-      arrange(importance)
+    importance_data <- importance_data[order(importance_data$importance), ]
   } else {
-    importance_data <- importance_data %>%
-      arrange(desc(importance))
+    importance_data <- importance_data[order(-importance_data$importance), ]
   }
 
   # Filter to top_n if specified
   if (!is.null(top_n) && is.numeric(top_n) && top_n > 0) {
-    importance_data <- importance_data %>%
-      slice_head(n = top_n)
+    importance_data <- head(importance_data, top_n)
   }
 
   # Reorder factor levels for proper plotting order
@@ -159,21 +153,18 @@ plot_importance <- function(
   # Add value labels if requested
   if (show_values) {
     # Position labels at the right end of bars
-    importance_data <- importance_data %>%
-      mutate(
-        label_pos = ifelse(
-          importance >= 0,
-          importance + max(abs(importance)) * 0.02,
-          importance - max(abs(importance)) * 0.02
-        ),
-        label_hjust = ifelse(importance >= 0, 0, 1)
-      )
+    importance_data$label_pos <- ifelse(
+      importance_data$importance >= 0,
+      importance_data$importance + max(abs(importance_data$importance)) * 0.02,
+      importance_data$importance - max(abs(importance_data$importance)) * 0.02
+    )
+    importance_data$label_hjust <- ifelse(importance_data$importance >= 0, 0, 1)
 
     p <- p +
       geom_text(
         data = importance_data,
         aes(x = label_pos, y = variable, label = round(importance, digits)),
-        color = "black", # Changed to black for better visibility outside bars
+        color = "black",
         size = text_size,
         hjust = importance_data$label_hjust
       )

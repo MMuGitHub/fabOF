@@ -1,3 +1,25 @@
+# Internal ray-casting point-in-polygon test
+.point_in_polygon <- function(px, py, poly_x, poly_y) {
+  n <- length(poly_x)
+  inside <- logical(length(px))
+  for (k in seq_along(px)) {
+    x <- px[k]
+    y <- py[k]
+    j <- n
+    c_val <- FALSE
+    for (i in 1:n) {
+      if (((poly_y[i] > y) != (poly_y[j] > y)) &&
+        (x < (poly_x[j] - poly_x[i]) * (y - poly_y[i]) /
+          (poly_y[j] - poly_y[i]) + poly_x[i])) {
+        c_val <- !c_val
+      }
+      j <- i
+    }
+    inside[k] <- c_val
+  }
+  inside
+}
+
 #' Create PDP Data Grid
 #'
 #' Internal helper function adapted from the vivid package to create a grid
@@ -68,8 +90,8 @@ pdp_data <- function(d, var, gridsize = 30, convexHull = FALSE) {
         pdpvar1CH <- pdpvar1[hpts] # get x-coords of polygon
         pdpvar2CH <- pdpvar2[hpts] # get y-coords of polygon
 
-        # find which are outside convex hull
-        res <- sp::point.in.polygon(gridvals$Var1, gridvals$Var2, pdpvar1CH, pdpvar2CH) != 0
+        # find which are outside convex hull (ray-casting algorithm)
+        res <- .point_in_polygon(gridvals$Var1, gridvals$Var2, pdpvar1CH, pdpvar2CH)
 
         # remove points outside convex hull
         gridvals <- gridvals[res, ]
