@@ -949,7 +949,7 @@ plot_pdp <- function(
             group = cond_color_group
           ),
           color = pdp_meancolor,
-          size = cond_mean_linewidth
+          linewidth = cond_mean_linewidth
         ) +
         # Add mean points
         geom_point(
@@ -1067,7 +1067,7 @@ plot_pdp <- function(
             summarise(mean_fit = mean(fit), .groups = "drop"),
           mapping = aes(y = x_value, x = mean_fit),
           color = pdp_linecolor,
-          size = pdp_linewidth,
+          linewidth = pdp_linewidth,
           position = position_nudge(y = -0.05)
         ) +
         ggdist::stat_pointinterval(
